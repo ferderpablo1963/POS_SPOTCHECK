@@ -27,8 +27,8 @@
         }
 
         #map-container { 
-            height: 1200px; 
-            width: 2000px;
+            height: 1100px; 
+            width: 1700px;
             position: relative;
             background-color: #ffffff;
             transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
@@ -48,7 +48,7 @@
             touch-action: none;
             user-select: none;
             cursor: pointer;
-            border-radius: 12px;
+            border-radius: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -56,18 +56,18 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
 
-        .mesa-free { background-color: #ffffff; color: #64748b; border: 2px solid #e2e8f0; }
+        .mesa-free { background-color: #ffffff; color: #475569; border: 2px solid #cbd5e1; }
         .mesa-occupied { 
             background-color: #000000 !important; 
             color: #ffffff !important; 
             border: 2px solid #000000 !important; 
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 8px 12px -3px rgba(0, 0, 0, 0.4);
         }
         .mesa-indet { 
             background-color: #ef4444 !important; 
             color: #ffffff !important; 
             border: 2px solid #ef4444 !important;
-            box-shadow: 0 10px 15px -3px rgba(239, 68, 68, 0.3);
+            box-shadow: 0 8px 12px -3px rgba(239, 68, 68, 0.4);
         }
 
         .design-mode .mesa {
@@ -78,22 +78,22 @@
 
         .handle {
             position: absolute;
-            width: 38px;
-            height: 38px;
-            border: 3px solid #ffffff;
+            width: 34px;
+            height: 34px;
+            border: 2px solid #ffffff;
             border-radius: 50%;
             display: none;
             z-index: 120;
             align-items: center;
             justify-content: center;
             color: white;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             touch-action: none;
         }
         
         .selected-design .handle { display: flex; }
-        .resizer-handle { right: -19px; bottom: -19px; background-color: #f59e0b; cursor: nwse-resize; }
-        .rotator-handle { right: -19px; top: -19px; background-color: #3b82f6; cursor: crosshair; }
+        .resizer-handle { right: -17px; bottom: -17px; background-color: #f59e0b; cursor: nwse-resize; }
+        .rotator-handle { right: -17px; top: -17px; background-color: #3b82f6; cursor: crosshair; }
 
         #toast {
             position: fixed;
@@ -115,6 +115,18 @@
             padding-bottom: 100px; 
         }
         .screen-overlay.active { display: flex; }
+
+        /* Elementos fijos decorativos del salón */
+        .decor-label {
+            position: absolute;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.25em;
+            color: #94a3b8;
+            font-size: 11px;
+            user-select: none;
+            pointer-events: none;
+        }
 
         @media print {
             header, nav, footer, .no-print { display: none !important; }
@@ -144,7 +156,7 @@
     <div class="bg-white border-b border-slate-200 px-6 py-3 flex justify-between items-center z-50 shrink-0">
         <div class="flex gap-4">
             <div>
-                <p class="text-[8px] font-black text-slate-400 uppercase">Oc/Ind</p>
+                <p class="text-[8px] font-black text-slate-400 uppercase">Activas</p>
                 <p id="stat-occupied" class="text-sm font-black">0</p>
             </div>
             <div class="w-[1px] h-6 bg-slate-100 my-auto"></div>
@@ -155,7 +167,7 @@
         </div>
         <div class="text-right flex items-center gap-4">
             <input type="file" id="pos-image-input" accept="image/*" class="hidden" onchange="processPOSImage(this)">
-            <button onclick="document.getElementById('pos-image-input').click()" id="btn-ocr" class="bg-slate-950 text-white px-3 py-2 rounded-lg text-[10px] font-black uppercase active:bg-slate-800 transition-colors flex items-center gap-1">
+            <button onclick="document.getElementById('pos-image-input').click()" id="btn-ocr" class="bg-slate-950 text-white px-3 py-2 rounded-lg text-[10px] font-black uppercase active:bg-slate-800 transition-colors flex items-center gap-1.5 shadow-sm">
                 <i class="fa-solid fa-camera"></i> <span id="ocr-btn-text">CRUZAR POS</span>
             </button>
             
@@ -177,6 +189,13 @@
 
     <main class="flex-1 overflow-hidden relative" id="main-scroll">
         <div id="map-container" onclick="deselectTable()">
+            <div id="decorations-layer" class="w-full h-full absolute inset-0 pointer-events-none select-none">
+                <div class="decor-label font-black text-slate-300 tracking-[0.6em]" style="left: 24%; top: 6%;">[ B A R R A ]</div>
+                <div class="decor-label font-black text-slate-300 tracking-[0.6em]" style="left: 45%; top: 93%;">[ E N T R A D A ]</div>
+                <div class="decor-label text-[9px]" style="left: 77%; top: 27%;">TV / MÓDULO</div>
+                <div class="decor-label text-[9px]" style="left: 77%; top: 61%;">TV / MÓDULO</div>
+                <div class="decor-label text-[9px]" style="left: 77%; top: 72%;">TV</div>
+            </div>
             <div id="mesas-layer" class="w-full h-full relative"></div>
         </div>
     </main>
@@ -190,7 +209,7 @@
             
             <div class="space-y-4">
                 <div>
-                    <label class="text-[9px] font-black uppercase text-slate-400 ml-2 italic">Mesas Abiertas Registradas</label>
+                    <label class="text-[9px] font-black uppercase text-slate-400 ml-2 italic">Mesas Totales del Plano</label>
                     <input id="note-abiertas" type="number" readonly class="w-full p-4 bg-slate-100 border border-slate-200 rounded-2xl font-black text-sm text-emerald-600">
                 </div>
 
@@ -316,7 +335,7 @@
             window.addEventListener('pointerup', handlePointerUp);
         }
 
-        /* LÓGICA DE DETECCIÓN AUTOMÁTICA OCR */
+        /* ALGORITMO OCR MEJORADO Y ULTRA FLEXIBLE */
         async function processPOSImage(input) {
             if (!input.files || !input.files[0]) return;
             
@@ -324,48 +343,53 @@
             const btnText = document.getElementById('ocr-btn-text');
             const btn = document.getElementById('btn-ocr');
             
-            // UI Feedback: Indicamos que está escaneando
             btnText.innerText = "LEYENDO...";
-            btn.className = "bg-amber-500 text-slate-950 px-3 py-2 rounded-lg text-[10px] font-black uppercase animate-pulse flex items-center gap-1";
+            btn.className = "bg-amber-500 text-slate-950 px-3 py-2 rounded-lg text-[10px] font-black uppercase animate-pulse flex items-center gap-1.5";
             showToast("Procesando foto del ticket...");
 
             try {
-                // Ejecutamos el motor Tesseract OCR en Español
-                const result = await Tesseract.recognize(file, 'spa');
-                const text = result.data.text;
+                const result = await Tesseract.recognize(file, 'spa+eng');
+                const rawText = result.data.text;
                 
-                // Expresión Regular para buscar "tbl [numero]" y extraer solo el número
-                const regex = /tbl\s+(\d+)/gi;
+                console.log("Texto Crudo detectado por OCR:", rawText);
+                
+                // Normalizamos el texto: pasamos a minúsculas y colapsamos espacios múltiples a uno solo
+                const cleanText = rawText.toLowerCase().replace(/\s+/g, ' ');
+                
+                // Buscamos 'tbl' seguido de cualquier espacio y capturamos los dígitos contiguos
+                const regex = /tbl\s*(\d+)/gi;
                 let match;
                 const foundTables = [];
                 
-                while ((match = regex.exec(text)) !== null) {
+                while ((match = regex.exec(cleanText)) !== null) {
                     foundTables.push(match[1].trim());
                 }
 
+                console.log("Mesas extraídas del reporte:", foundTables);
+
                 if (foundTables.length === 0) {
-                    showToast("No se detectaron palabras 'tbl' en la foto.");
+                    alert("No se detectó la palabra 'tbl' con números válidos en la imagen. Verifique la nitidez de la foto.");
+                    showToast("Fallo en lectura");
                 } else {
-                    // Aplicamos el cruce de datos inteligente
+                    // Sincronización cruzada inteligente
                     tables.forEach(t => {
-                        if (foundTables.includes(t.label)) {
-                            t.status = 'occupied'; // Pinta de Negro si está en el reporte
+                        if (foundTables.includes(t.label.toLowerCase())) {
+                            t.status = 'occupied'; // NEGRO si figura en el ticket
                         } else {
-                            t.status = 'indet';    // Pinta de Rojo si NO está en el reporte
+                            t.status = 'indet';    // ROJO si falta en el ticket
                         }
                     });
                     saveData();
                     render();
-                    showToast(`Cruce Exitoso: ${foundTables.length} mesas sincronizadas`);
+                    showToast(`Cruce Exitoso: ${foundTables.length} mesas cruzadas`);
                 }
             } catch (error) {
-                console.error(error);
+                console.error("Error OCR:", error);
                 showToast("Error al procesar la imagen");
             } finally {
-                // Restablecemos el botón a su estado normal
                 btnText.innerText = "CRUZAR POS";
-                btn.className = "bg-slate-950 text-white px-3 py-2 rounded-lg text-[10px] font-black uppercase active:bg-slate-800 transition-colors flex items-center gap-1";
-                input.value = ''; // Limpiamos el input file
+                btn.className = "bg-slate-950 text-white px-3 py-2 rounded-lg text-[10px] font-black uppercase active:bg-slate-800 transition-colors flex items-center gap-1.5";
+                input.value = '';
             }
         }
 
@@ -376,11 +400,11 @@
             if (!isFitted) {
                 const scaleX = main.clientWidth / container.offsetWidth;
                 const scaleY = main.clientHeight / container.offsetHeight;
-                const finalScale = Math.min(scaleX, scaleY, 1) * 0.95;
+                const finalScale = Math.min(scaleX, scaleY, 1) * 0.96;
                 container.style.transform = `scale(${finalScale})`;
                 btn.classList.replace('bg-slate-100', 'bg-emerald-500');
                 btn.classList.replace('text-slate-600', 'text-white');
-                showToast("Vista Encajada");
+                showToast("Vista Ajustada");
             } else {
                 container.style.transform = `scale(1)`;
                 btn.classList.replace('bg-emerald-500', 'bg-slate-100');
@@ -440,35 +464,45 @@
             }, 1000);
         }
 
+        /* RECONSTRUCCIÓN FIEL DEL PLANO ASOCIADO AL EXCEL */
         function createInitialLayout() {
             const layoutData = [
-                { label: "1", x: 73, y: 12, w: 65, h: 65 },
-                { label: "2", x: 79, y: 12, w: 65, h: 65 },
-                { label: "3", x: 85, y: 12, w: 65, h: 65 },
-                { label: "4", x: 67, y: 22, w: 65, h: 65 },
-                { label: "5", x: 71, y: 22, w: 65, h: 65 },
-                { label: "6", x: 75, y: 22, w: 65, h: 65 },
-                { label: "7", x: 79, y: 22, w: 65, h: 65 },
-                { label: "8", x: 91, y: 31, w: 65, h: 65 },
-                { label: "9", x: 96, y: 31, w: 65, h: 65 },
-                { label: "33", x: 28, y: 36, w: 65, h: 65 },
-                { label: "30", x: 50, y: 39, w: 65, h: 65 },
-                { label: "34", x: 32, y: 49, w: 65, h: 65 },
-                { label: "31", x: 50, y: 49, w: 65, h: 65 },
-                { label: "20", x: 69, y: 51, w: 65, h: 65 },
-                { label: "21", x: 75, y: 51, w: 65, h: 65 },
-                { label: "23", x: 69, y: 64, w: 65, h: 65 },
-                { label: "22", x: 75, y: 64, w: 65, h: 65 },
-                { label: "10", x: 91, y: 61, w: 65, h: 65 },
-                { label: "11", x: 91, y: 73, w: 65, h: 65 },
-                { label: "24", x: 58, y: 75, w: 65, h: 65 },
-                { label: "32", x: 44, y: 86, w: 65, h: 65 },
-                { label: "25", x: 64, y: 86, w: 65, h: 65 },
-                { label: "40", x: 12, y: 12, w: 65, h: 65 },
-                { label: "41", x: 12, y: 31, w: 65, h: 65 },
-                { label: "42", x: 12, y: 36, w: 65, h: 65 },
-                { label: "43", x: 12, y: 51, w: 65, h: 65 },
-                { label: "44", x: 14, y: 69, w: 65, h: 65 }
+                // Fila Superior (Lado de la Barra / Arriba)
+                { label: "1", x: 74, y: 13, w: 55, h: 55 },
+                { label: "2", x: 81, y: 13, w: 55, h: 55 },
+                { label: "3", x: 88, y: 13, w: 55, h: 55 },
+                { label: "4", x: 71, y: 24, w: 55, h: 55 },
+                { label: "5", x: 76, y: 24, w: 55, h: 55 },
+                { label: "6", x: 81, y: 24, w: 55, h: 55 },
+                { label: "7", x: 86, y: 24, w: 55, h: 55 },
+                
+                // Bloque Lateral Izquierdo (Módulos 40-44)
+                { label: "40", x: 12, y: 14, w: 55, h: 55 },
+                { label: "41", x: 12, y: 28, w: 55, h: 55 },
+                { label: "42", x: 12, y: 42, w: 55, h: 55 },
+                { label: "43", x: 12, y: 56, w: 55, h: 55 },
+                { label: "44", x: 14, y: 72, w: 55, h: 55 },
+                
+                // Módulos Centrales e Intermedios
+                { label: "33", x: 28, y: 42, w: 55, h: 55 },
+                { label: "34", x: 30, y: 56, w: 55, h: 55 },
+                { label: "30", x: 44, y: 44, w: 55, h: 55 },
+                { label: "31", x: 44, y: 56, w: 55, h: 55 },
+                { label: "32", x: 42, y: 86, w: 55, h: 55 },
+                
+                // Lado Derecho Superior / Central (TV / Módulo)
+                { label: "8",  x: 91, y: 34, w: 55, h: 55 },
+                { label: "9",  x: 97, y: 34, w: 55, h: 55 },
+                { label: "20", x: 70, y: 54, w: 55, h: 55 },
+                { label: "21", x: 76, y: 54, w: 55, h: 55 },
+                { label: "23", x: 70, y: 67, w: 55, h: 55 },
+                { label: "22", x: 76, y: 67, w: 55, h: 55 },
+                
+                // Lado Derecho Inferior
+                { label: "10", x: 91, y: 64, w: 55, h: 55 },
+                { label: "11", x: 91, y: 76, w: 55, h: 55 },
+                { label: "24", x: 58, y: 78, w: 55, h: 55 },
+                { label: "25", x: 64, y: 86, w: 55, h: 55 }
             ];
 
             tables = layoutData.map((t, idx) => ({
@@ -502,18 +536,18 @@
                 div.style.width = `${t.w}px`;
                 div.style.height = `${t.h}px`;
                 div.style.transform = `translate(-50%, -50%) rotate(${t.rotation || 0}deg)`;
-                div.style.fontSize = `${Math.min(t.w, t.h) * 0.35}px`;
+                div.style.fontSize = `${Math.min(t.w, t.h) * 0.38}px`;
                 div.innerHTML = `<span style="transform: rotate(-${t.rotation || 0}deg)">${t.label}</span>`;
                 
                 if (currentMode === 'design' && !isLocked) {
                     const resizer = document.createElement('div');
                     resizer.className = 'handle resizer-handle';
-                    resizer.innerHTML = '<i class="fa-solid fa-maximize text-[10px]"></i>';
+                    resizer.innerHTML = '<i class="fa-solid fa-maximize text-[9px]"></i>';
                     resizer.onpointerdown = (e) => { e.stopPropagation(); resizingId = t.id; startPos = { x: e.clientX, y: e.clientY }; startMesaSize = { w: t.w, h: t.h }; };
                     div.appendChild(resizer);
                     const rotator = document.createElement('div');
                     rotator.className = 'handle rotator-handle';
-                    rotator.innerHTML = '<i class="fa-solid fa-rotate text-[10px]"></i>';
+                    rotator.innerHTML = '<i class="fa-solid fa-rotate text-[9px]"></i>';
                     rotator.onpointerdown = (e) => { e.stopPropagation(); rotatingId = t.id; };
                     div.appendChild(rotator);
                 }
@@ -557,7 +591,7 @@
         function toggleLock() { 
             isLocked = !isLocked; 
             updateLockUI(); saveData(); 
-            showToast(isLocked ? "Cerrado para Auditoría" : "Modo Edición Activado");
+            showToast(isLocked ? "Auditoría Activada" : "Modo Edición Activado");
             render();
         }
 
@@ -583,23 +617,23 @@
         function deselectTable() { if(!draggingId && !resizingId && !rotatingId) { selectedId = null; updateDesignPanel(); render(); } }
         function deleteSelected() { tables = tables.filter(t => t.id !== selectedId); deselectTable(); saveData(); }
         function addTable(type) { 
-            tables.push({ id: Date.now(), x: 50, y: 50, label: (tables.length + 1).toString(), status: 'free', w: type === 'vip' ? 140 : 70, h: type === 'vip' ? 80 : 70, rotation: 0 }); 
+            tables.push({ id: Date.now(), x: 50, y: 50, label: (tables.length + 1).toString(), status: 'free', w: type === 'vip' ? 120 : 55, h: type === 'vip' ? 70 : 55, rotation: 0 }); 
             saveData(); render(); 
         }
 
-        function clearCurrentAudit() { if(!confirm("¿Resetear el control actual?")) return; tables.forEach(t => t.status = 'free'); saveData(); render(); showToast("Plano Reiniciado"); }
+        function clearCurrentAudit() { if(!confirm("¿Desea limpiar el control actual?")) return; tables.forEach(t => t.status = 'free'); saveData(); render(); showToast("Plano Reiniciado"); }
 
         function saveAudit() {
             const occupied = tables.filter(t => t.status === 'occupied').length;
             const indet = tables.filter(t => t.status === 'indet').length;
             const totalActive = occupied + indet;
             audits.unshift({
-                id: Date.now(), date: new Date().toLocaleDateString(), time: document.getElementById('note-hora').value, abiertas: tables.length, lugar: document.getElementById('note-lugar').value || 'Sin Sector',
-                insitu: document.getElementById('note-insitu').value || totalActive, micros: document.getElementById('note-micros').value || '-', firma: (document.getElementById('note-firma').value || 'ADMIN').toUpperCase(),
+                id: Date.now(), date: new Date().toLocaleDateString(), time: document.getElementById('note-hora').value, abiertas: tables.length, lugar: document.getElementById('note-lugar').value || 'Lobby Bar',
+                insitu: document.getElementById('note-insitu').value || totalActive, micros: document.getElementById('note-micros').value || '-', firma: (document.getElementById('note-firma').value || 'AUDITOR').toUpperCase(),
                 obs: document.getElementById('note-observaciones').value || 'Ninguna', percent: Math.round((totalActive / tables.length) * 100)
             });
             tables.forEach(t => t.status = 'free');
-            saveData(); closeModal('audit-modal'); setMode('history'); showToast("Reporte Finalizado");
+            saveData(); closeModal('audit-modal'); setMode('history'); showToast("Reporte Guardado");
         }
 
         function renderHistory() {
@@ -607,7 +641,7 @@
                 <div id="audit-card-${a.id}" class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 relative overflow-hidden">
                     <div class="absolute top-0 left-0 w-2 h-full bg-emerald-500"></div>
                     <div class="absolute top-6 right-6 flex gap-2 no-print">
-                         <button onclick="exportAuditAsTxt(${a.id})" class="w-8 h-8 text-slate-400 hover:text-emerald-500 transition-colors" title="Exportar TXT"><i class="fa-solid fa-file-export"></i></button>
+                         <button onclick="exportAuditAsTxt(${a.id})" class="w-8 h-8 text-slate-400 hover:text-emerald-500 transition-colors"><i class="fa-solid fa-file-export"></i></button>
                          <button onclick="deleteAudit(${a.id})" class="w-8 h-8 text-slate-200 hover:text-red-500 transition-colors"><i class="fa-solid fa-trash-can"></i></button>
                     </div>
                     <div class="border-b border-slate-50 pb-3 mb-4 flex justify-between items-end">
@@ -622,15 +656,15 @@
                     </div>
                     <div class="space-y-2 text-[10px]">
                         <div class="flex justify-between border-b border-slate-50 pb-1">
-                            <span class="text-slate-400 font-bold uppercase">Mesas Registradas:</span>
+                            <span class="text-slate-400 font-bold uppercase">Mesas en Matriz:</span>
                             <span class="font-black text-slate-950">${a.abiertas}</span>
                         </div>
                         <div class="flex justify-between border-b border-slate-50 pb-1">
                             <span class="text-slate-400 font-bold uppercase">In Situ (${a.lugar}):</span>
-                            <span class="font-black text-slate-900">${a.insitu} ocupadas</span>
+                            <span class="font-black text-slate-900">${a.insitu} registradas</span>
                         </div>
                         <div class="flex justify-between border-b border-slate-50 pb-1">
-                            <span class="text-slate-400 font-bold uppercase">Captura Micros:</span>
+                            <span class="text-slate-400 font-bold uppercase">Captura POS:</span>
                             <span class="font-black text-slate-950">${a.micros}</span>
                         </div>
                         <div class="pt-2">
@@ -642,7 +676,7 @@
                                 <span class="text-slate-400 font-bold uppercase text-[7px] block">Responsable</span>
                                 <span class="font-black text-slate-900 uppercase italic">${a.firma}</span>
                             </div>
-                            <button onclick="window.print()" class="no-print bg-slate-100 text-slate-500 px-4 py-2 rounded-xl text-[8px] font-black uppercase">Compartir PDF</button>
+                            <button onclick="window.print()" class="no-print bg-slate-100 text-slate-500 px-4 py-2 rounded-xl text-[8px] font-black uppercase">Imprimir PDF</button>
                         </div>
                     </div>
                 </div>
@@ -652,34 +686,14 @@
         function exportAuditAsTxt(id) {
             const a = audits.find(x => x.id === id);
             if(!a) return;
-            const content = `
-========================================
-       REPORTE SPOT CHECK (TXT)
-========================================
-FECHA: ${a.date}
-HORA: ${a.time}
-RESPONSABLE: ${a.firma}
-----------------------------------------
-MESAS REGISTRADAS: ${a.abiertas}
-SECTOR EVALUADO: ${a.lugar}
-MESAS OCUPADAS (IN SITU): ${a.insitu}
-OCUPACIÓN PERCENTUAL: ${a.percent}%
-CAPTURA MICROS: ${a.micros}
-----------------------------------------
-OBSERVACIONES:
-${a.obs}
-========================================
-Generado por SPOT CHECK System
-            `.trim();
-
+            const content = `========================================\n       REPORTE SPOT CHECK (TXT)\n========================================\nFECHA: ${a.date}\nHORA: ${a.time}\nRESPONSABLE: ${a.firma}\n----------------------------------------\nMESAS REGISTRADAS: ${a.abiertas}\nSECTOR EVALUADO: ${a.lugar}\nMESAS OCUPADAS (IN SITU): ${a.insitu}\nOCUPACIÓN PERCENTUAL: ${a.percent}%\nCAPTURA MICROS: ${a.micros}\n----------------------------------------\nOBSERVACIONES:\n${a.obs}\n========================================`;
             const blob = new Blob([content], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            link.download = `SPOTCHECK_Reporte_${a.date.replace(/\//g, '-')}_${a.time.replace(/:/g, '')}.txt`;
+            link.download = `SPOTCHECK_Reporte_${a.date.replace(/\//g, '-')}.txt`;
             link.click();
             URL.revokeObjectURL(url);
-            showToast("Archivo TXT Descargado");
         }
 
         function deleteAudit(id) { if(confirm("¿Eliminar este reporte?")) { audits = audits.filter(a => a.id !== id); saveData(); renderHistory(); } }
@@ -692,7 +706,7 @@ Generado por SPOT CHECK System
             t.classList.add('show');
             setTimeout(() => t.classList.remove('show'), 2000);
         }
-        function resetLayout() { if (confirm("¿Limpiar todo el diseño actual?")) { createInitialLayout(); render(); } }
+        function resetLayout() { if (confirm("¿Limpiar todo el diseño y restablecer el plano original del Excel?")) { createInitialLayout(); render(); } }
         function saveData() {
             localStorage.setItem(`${DB_PREFIX}_tables`, JSON.stringify(tables));
             localStorage.setItem(`${DB_PREFIX}_audits`, JSON.stringify(audits));
