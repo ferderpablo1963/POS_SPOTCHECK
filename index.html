@@ -495,4 +495,418 @@
 
             if (microsVal === '') {
                 badge.innerText = "Esperando POS";
-                badge.className = "px-3 py-1 rounded-full font-black text-[10px] uppercase
+                badge.className = "px-3 py-1 rounded-full font-black text-[10px] uppercase bg-slate-200 text-slate-600";
+                box.className = "p-3 bg-slate-50 border border-slate-200 rounded-xl flex justify-between items-center";
+                return;
+            }
+
+            const micros = parseInt(microsVal) || 0;
+            const diff = insitu - micros;
+
+            if (diff === 0) {
+                badge.innerText = "OK - Coinciden";
+                badge.className = "px-3 py-1 rounded-full font-black text-[10px] uppercase bg-emerald-500 text-white shadow-sm";
+                box.className = "p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex justify-between items-center";
+            } else {
+                badge.innerText = `Discrepancia: ${diff > 0 ? '+' : ''}${diff}`;
+                badge.className = "px-3 py-1 rounded-full font-black text-[10px] uppercase bg-red-500 text-white shadow-sm";
+                box.className = "p-3 bg-red-50 border border-red-200 rounded-xl flex justify-between items-center";
+            }
+        }
+
+        function render() {
+            const layer = document.getElementById('mesas-layer');
+            layer.innerHTML = '';
+            const container = document.getElementById('map-container');
+            container.className = `${currentMode === 'design' ? 'design-grid' : ''}`;
+
+            let activeCount = 0;
+            tables.forEach(t => {
+                if(t.status === 'occupied' || t.status === 'indet') activeCount++;
+                const div = document.createElement('div');
+                let statusClass = t.status === 'occupied' ? 'mesa-occupied' : (t.status === 'indet' ? 'mesa-indet' : 'mesa-free');
+                div.className = `mesa ${statusClass} ${selectedId === t.id && currentMode === 'design' ? 'selected-design' : ''}`;
+                div.setAttribute('data-id', t.id);
+                
+                div.style.left = `${t.x}px`;
+                div.style.top = `${t.y}px`;
+                div.style.width = `${t.w}px`;
+                div.style.height = `${t.h}px`;
+                div.style.transform = `translate(-50%, -50%) rotate(${t.rotation || 0}deg)`;
+                div.style.fontSize = `${Math.min(t.w, t.h) * 0.35}px`;
+                div.innerHTML = `<span style="transform: rotate(-${t.rotation || 0}deg)">${t.label}</span>`;
+                
+                if (currentMode === 'design' && !isLocked) {
+                    const resizer = document.createElement('div');
+                    resizer.className = 'handle resizer-handle';
+                    resizer.innerHTML = '<i class="fa-solid fa-maximize text-[10px]"></i>';
+                    resizer.onpointerdown = (e) => { e.stopPropagation(); resizingId = t.id; startPos = { x: e.clientX, y: e.clientY }; startMesaSize = { w: t.w, h: t.h }; };
+                    div.appendChild(resizer);
+                    const rotator = document.createElement('div');
+                    rotator.className = 'handle rotator-handle';
+                    rotator.innerHTML = '<i class="fa-solid fa-rotate text-[10px]"></i>';
+                    rotator.onpointerdown = (e) => { e.stopPropagation(); rotatingId = t.id; };
+                    div.appendChild(rotator);
+                }
+
+                div.onpointerdown = (e) => {
+                    if (currentMode === 'design' && !isLocked) {
+                        e.stopPropagation();
+                        selectedId = t.id; draggingId = t.id;
+                        startPos = { x: e.clientX, y: e.clientY }; 
+                        startMesaPos = { x: t.x, y: t.y };
+                        updateDesignPanel(); render();
+                    } else if (currentMode === 'audit') {
+                        if (t.status === 'free' || !t.status) t.status = 'occupied';
+                        else if (t.status === 'occupied') t.status = 'indet';
+                        else t.status = 'free';
+                        saveData(); render();
+                    }
+                };
+                layer.appendChild(div);
+            });
+            document.getElementById('stat-occupied').innerText = activeCount;
+            document.getElementById('stat-percent').innerText = (tables.length > 0 ? Math.round((activeCount / tables.length) * 100) : 0) + '%';
+            
+            if (document.getElementById('note-insitu')) {
+                document.getElementById('note-insitu').value = activeCount;
+            }
+        }
+
+        function setMode(m) {
+            currentMode = m;
+            selectedId = null;
+            ['audit', 'design', 'notes', 'history'].forEach(mode => {
+                const btn = document.getElementById(`nav-${mode}`);
+                btn.className = `flex-1 py-3 rounded-xl font-black text-[10px] uppercase transition-all ${mode === m ? 'bg-white shadow-sm text-slate-950 border-b-2 border-emerald-500' : 'text-slate-400'}`;
+            });
+            document.getElementById('main-footer').classList.toggle('hidden', m === 'notes' || m === 'history');
+            document.getElementById('audit-controls').classList.toggle('hidden', m === 'design');
+            document.getElementById('design-controls').classList.toggle('hidden', m !== 'design');
+            document.getElementById('notes-screen').classList.toggle('active', m === 'notes');
+            document.getElementById('history-screen').classList.toggle('active', m === 'history');
+            
+            if (m === 'notes') {
+                const now = new Date();
+                document.getElementById('note-hora').value = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                calculateDiscrepancy();
+            }
+            if (m === 'history') renderHistory();
+            updateDesignPanel(); render();
+        }
+
+        function toggleLock() { 
+            isLocked = !isLocked; 
+            updateLockUI(); saveData(); 
+            showToast(isLocked ? "Cerrado para Auditoría" : "Modo Edición Activado");
+            render();
+        }
+
+        function updateLockUI() {
+            document.getElementById('lock-icon').className = isLocked ? 'fa-solid fa-lock text-red-500' : 'fa-solid fa-unlock text-emerald-400';
+            document.getElementById('lock-text').innerText = isLocked ? 'Bloqueado' : 'Edición';
+            document.getElementById('lock-text').className = `text-[9px] font-black uppercase ${isLocked ? 'text-red-400' : 'text-emerald-400'}`;
+        }
+
+        function updateDesignPanel() {
+            const zone = document.getElementById('table-edit-zone');
+            const actions = document.getElementById('design-actions');
+            const input = document.getElementById('label-input');
+            if (selectedId && !isLocked && currentMode === 'design') {
+                zone.classList.remove('hidden'); actions.classList.add('hidden');
+                input.value = tables.find(t => t.id === selectedId).label;
+                input.oninput = (e) => { tables.find(t => t.id === selectedId).label = e.target.value; render(); saveData(); };
+            } else {
+                zone.classList.add('hidden'); actions.classList.remove('hidden');
+            }
+        }
+
+        function deselectTable() { if(!draggingId && !resizingId && !rotatingId) { selectedId = null; updateDesignPanel(); render(); } }
+        function deleteSelected() { tables = tables.filter(t => t.id !== selectedId); deselectTable(); saveData(); }
+        function addTable(type) { 
+            tables.push({ id: Date.now(), x: 250, y: 250, label: (tables.length + 1).toString(), status: 'free', w: type === 'vip' ? 140 : 70, h: type === 'vip' ? 80 : 70, rotation: 0 }); 
+            saveData(); render(); 
+        }
+
+        function clearCurrentAudit() { if(!confirm("¿Resetear el control actual?")) return; tables.forEach(t => t.status = 'free'); saveData(); render(); showToast("Plano Reiniciado"); }
+
+        function saveAudit() {
+            const activeTablesDetail = [];
+            let insituCount = 0;
+
+            tables.forEach(t => {
+                if (t.status === 'occupied' || t.status === 'indet') {
+                    insituCount++;
+                    activeTablesDetail.push({
+                        label: t.label,
+                        type: t.status === 'occupied' ? 'OCUPADA' : 'DISCREPANTE'
+                    });
+                }
+            });
+
+            activeTablesDetail.sort((a, b) => parseInt(a.label) - parseInt(b.label));
+
+            const microsVal = parseInt(document.getElementById('note-micros').value) || 0;
+            const discrepancyNum = insituCount - microsVal;
+
+            const lugarVal = document.getElementById('note-lugar') ? document.getElementById('note-lugar').value.trim() : 'Salón Principal';
+            const firmaVal = document.getElementById('note-firma') ? document.getElementById('note-firma').value.trim() : 'AUDITOR';
+            const obsVal = document.getElementById('note-observaciones') ? document.getElementById('note-observaciones').value.trim() : 'Sin observaciones.';
+            const horaVal = document.getElementById('note-hora') ? document.getElementById('note-hora').value : new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+
+            const newAudit = {
+                id: Date.now(), 
+                date: new Date().toLocaleDateString(), 
+                time: horaVal, 
+                lugar: lugarVal || 'Salón Principal',
+                insitu: insituCount, 
+                micros: microsVal,
+                discrepancy: discrepancyNum,
+                firma: (firmaVal || 'AUDITOR').toUpperCase(),
+                obs: obsVal || 'Sin observaciones.',
+                reportedTables: activeTablesDetail
+            };
+
+            audits.unshift(newAudit);
+            saveData(); 
+
+            tables.forEach(t => t.status = 'free');
+            if(document.getElementById('note-micros')) document.getElementById('note-micros').value = '';
+            if(document.getElementById('note-observaciones')) document.getElementById('note-observaciones').value = '';
+            if(document.getElementById('note-lugar')) document.getElementById('note-lugar').value = '';
+            if(document.getElementById('note-firma')) document.getElementById('note-firma').value = '';
+            
+            closeModal('audit-modal'); 
+            setMode('history'); 
+            showToast("Reporte Guardado");
+        }
+
+        function renderHistory() {
+            document.getElementById('history-list').innerHTML = audits.map((a) => {
+                const tableRows = a.reportedTables.map(t => `
+                    <div class="flex justify-between py-1.5 print-table-row border-b border-slate-100 text-[11px]">
+                        <span class="font-black text-slate-900">Mesa ${t.label}</span>
+                        <span class="px-2 py-0.5 rounded text-[9px] font-black ${t.type === 'OCUPADA' ? 'bg-slate-900 text-white' : 'bg-red-500 text-white'}">${t.type}</span>
+                    </div>
+                `).join('');
+
+                const noDiscrepancy = a.discrepancy === 0;
+
+                return `
+                <div id="audit-card-${a.id}" class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-200 relative overflow-hidden print-card">
+                    <div class="absolute top-0 left-0 w-2.5 h-full ${noDiscrepancy ? 'bg-emerald-500' : 'bg-red-500'} no-print"></div>
+                    
+                    <div class="absolute top-6 right-6 flex gap-2 no-print">
+                         <button onclick="exportAuditAsTxt(${a.id})" class="w-8 h-8 text-slate-400 hover:text-emerald-500 transition-colors" title="Exportar TXT"><i class="fa-solid fa-file-export"></i></button>
+                         <button onclick="deleteAudit(${a.id})" class="w-8 h-8 text-slate-200 hover:text-red-500 transition-colors"><i class="fa-solid fa-trash-can"></i></button>
+                    </div>
+
+                    <div class="border-b border-slate-200 pb-3 mb-4 flex justify-between items-end">
+                        <div>
+                            <h4 class="text-xs font-black text-slate-900 uppercase italic tracking-tight">REPORTE AUDITORÍA SPOT CHECK</h4>
+                            <p class="text-[9px] text-slate-400 font-bold uppercase">${a.date} | ${a.time} - ${a.lugar}</p>
+                        </div>
+                        <div class="text-right">
+                             <p class="text-sm font-black ${noDiscrepancy ? 'text-emerald-600' : 'text-red-600'} leading-none">
+                                ${noDiscrepancy ? 'CONCILIADO' : 'DIFERENCIA: ' + (a.discrepancy > 0 ? '+' : '') + a.discrepancy}
+                             </p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4 text-[11px] mb-4 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                        <div>
+                            <span class="text-slate-400 font-bold uppercase text-[9px]">Mesas Ocupadas (In Situ):</span>
+                            <p class="font-black text-slate-950 text-base leading-none mt-1">${a.insitu}</p>
+                        </div>
+                        <div>
+                            <span class="text-slate-400 font-bold uppercase text-[9px]">Mesas Abiertas (POS/Micros):</span>
+                            <p class="font-black text-slate-950 text-base leading-none mt-1">${a.micros}</p>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <span class="text-slate-400 font-bold uppercase text-[9px] block mb-2">Detalle de Mesas bajo Control:</span>
+                        <div class="max-h-40 overflow-y-auto space-y-1 pr-1">
+                            ${tableRows || '<p class="text-slate-400 italic text-center py-2 text-[10px]">No se registraron mesas activas en este control.</p>'}
+                        </div>
+                    </div>
+
+                    <div class="pt-2 border-t border-slate-100">
+                        <span class="text-slate-400 font-bold uppercase block text-[9px] mb-1">Notas y Descargos:</span>
+                        <p class="italic text-slate-700 bg-slate-50 p-3 rounded-xl border border-slate-100 text-[10px] leading-normal">${a.obs}</p>
+                    </div>
+
+                    <div class="pt-4 flex justify-between items-center">
+                        <div>
+                            <span class="text-slate-400 font-bold uppercase text-[8px] block">Auditor a Cargo</span>
+                            <span class="font-black text-slate-900 uppercase italic text-xs tracking-tight">${a.firma}</span>
+                        </div>
+                        <button onclick="window.print()" class="no-print bg-slate-950 text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase shadow-md active:scale-95 transition-all">
+                            <i class="fa-solid fa-file-pdf mr-1"></i> Compartir PDF
+                        </button>
+                    </div>
+                </div>
+                `;
+            }).join('') || '<p class="text-center text-slate-300 py-20 uppercase font-black text-[10px] italic">No hay reportes emitidos</p>';
+        }
+
+        function exportAuditAsTxt(id) {
+            const a = audits.find(x => x.id === id);
+            if(!a) return;
+            let tablesListText = a.reportedTables.map(t => `  - Mesa ${t.label}: [${t.type}]`).join('\n');
+            if(!tablesListText) tablesListText = "  Ninguna mesa activa.";
+
+            const content = `
+==================================================
+       REPORTE DE AUDITORÍA SPOT CHECK (TXT)
+==================================================
+FECHA: ${a.date}
+HORA: ${a.time}
+SECTOR EVALUADO: ${a.lugar}
+AUDITOR RESPONSABLE: ${a.firma}
+--------------------------------------------------
+MESAS OCUPADAS EN PLANO (IN SITU): ${a.insitu}
+MESAS EN SISTEMA DE VENTAS (POS):  ${a.micros}
+CONCILIACIÓN / DISCREPANCIA:      ${a.discrepancy}
+--------------------------------------------------
+DETALLE DE MESAS ACTIVAS ENCONTRADAS:
+${tablesListText}
+--------------------------------------------------
+OBSERVACIONES Y DESCARGOS:
+${a.obs}
+==================================================
+Generado por el Sistema de Control SPOT CHECK
+            `.trim();
+
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `SPOTCHECK_Reporte_${a.date.replace(/\//g, '-')}_${a.time.replace(/:/g, '')}.txt`;
+            link.click();
+            URL.revokeObjectURL(url);
+            showToast("Archivo TXT Descargado");
+        }
+
+        function deleteAudit(id) { if(confirm("¿Eliminar este reporte?")) { audits = audits.filter(a => a.id !== id); saveData(); renderHistory(); } }
+        function clearHistory() { if(confirm("¿Seguro de borrar TODO el historial?")) { audits = []; saveData(); renderHistory(); } }
+        function openModal(id) { document.getElementById(id).classList.replace('hidden', 'flex'); }
+        function closeModal(id) { document.getElementById(id).classList.replace('flex', 'hidden'); }
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            document.getElementById('toast-msg').innerText = msg;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 2000);
+        }
+        function resetLayout() { if (confirm("¿Limpiar todo el diseño actual?")) { createInitialLayout(); render(); } }
+        
+        function saveData() {
+            localStorage.setItem(`${DB_PREFIX}_tables`, JSON.stringify(tables));
+            localStorage.setItem(`${DB_PREFIX}_audits`, JSON.stringify(audits));
+            localStorage.setItem(`${DB_PREFIX}_locked`, JSON.stringify(isLocked));
+        }
+
+        function triggerCameraOCR() {
+            document.getElementById('ocr-camera-input').click();
+        }
+
+        /* ESCÁNER BLINDADO: PARSEO SEGURO LÍNEA POR LÍNEA SIN BUCELES INFINITOS */
+        function processImageOCR(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const ocrIcon = document.getElementById('btn-ocr-icon');
+            const ocrText = document.getElementById('btn-ocr-text');
+
+            ocrIcon.className = "fa-solid fa-spinner animate-spin text-amber-400 text-sm";
+            ocrText.innerText = "LEYENDO...";
+            showToast("Procesando reporte POS...");
+
+            // REGLA OBLIGATORIA: Dejar el plano limpio antes del escaneo
+            tables.forEach(t => t.status = 'free');
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+
+                    // Binarización de alto contraste
+                    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const data = imgData.data;
+                    for (let i = 0; i < data.length; i += 4) {
+                        const brightness = 0.34 * data[i] + 0.5 * data[i + 1] + 0.16 * data[i + 2];
+                        const threshold = brightness < 140 ? 0 : 255; 
+                        data[i] = data[i+1] = data[i+2] = threshold;
+                    }
+                    ctx.putImageData(imgData, 0, 0);
+
+                    Tesseract.recognize(
+                        canvas.toDataURL(),
+                        'eng',
+                        { logger: m => console.log(m) }
+                    ).then(({ data: { text } }) => {
+                        
+                        // Procesamos convirtiendo strings en líneas separadas para evitar colgar el hilo
+                        const lines = text.toLowerCase()
+                                          .replace(/tb1/g, 'tbl')
+                                          .replace(/tbi/g, 'tbl')
+                                          .split('\n');
+
+                        const detectedNumbers = [];
+                        
+                        // REGLA ESTRICTA EN EXPRESIÓN REGULAR:
+                        // tbl -> la palabra
+                        // \s  -> exactamente un espacio
+                        // (\d+)-> captura el número
+                        // /   -> exige barra diagonal de cierre
+                        const strictRegex = /tbl\s(\d+)\//;
+
+                        for (let line of lines) {
+                            // Limpiamos espacios múltiples dentro de la línea actual
+                            const cleanLine = line.replace(/\s+/g, ' ').trim();
+                            const match = strictRegex.exec(cleanLine);
+                            if (match) {
+                                detectedNumbers.push(match[1]); // Guarda el ID de la mesa
+                            }
+                        }
+
+                        // Pintar las mesas que coincidan
+                        let matchedCount = 0;
+                        tables.forEach(t => {
+                            if (detectedNumbers.includes(t.label)) {
+                                t.status = 'occupied';
+                                matchedCount++;
+                            }
+                        });
+
+                        if (matchedCount > 0) {
+                            showToast(`Sincronizado: ${matchedCount} mesas ocupadas`);
+                        } else {
+                            showToast("No se detectó el patrón estricto 'Tbl [número]/'.");
+                        }
+                        saveData();
+                        render();
+                    }).catch(err => {
+                        console.error("Error en procesamiento de OCR:", err);
+                        showToast("Fallo en la lectura del documento");
+                        render();
+                    }).finally(() => {
+                        ocrIcon.className = "fa-solid fa-camera text-sm";
+                        ocrText.innerText = "SCAN";
+                        document.getElementById('ocr-camera-input').value = "";
+                    });
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        init();
+    </script>
+</body>
+</html>
