@@ -112,7 +112,7 @@
             transform: translateX(-50%) translateY(100px);
             transition: transform 0.2s ease-out;
             z-index: 1000;
-            pointer-events: none; /* Crucial: para que nunca tape los clics si se queda colgado */
+            pointer-events: none;
         }
         #toast.show { transform: translateX(-50%) translateY(0); }
         
@@ -128,7 +128,6 @@
         }
         .screen-overlay.active { display: flex; }
 
-        /* CONSULTA DE MEDIOS PARA MODO PAISAJE EN TELÉFONOS MÓVILES */
         @media (max-height: 520px) and (orientation: landscape) {
             header { padding-top: 6px !important; padding-bottom: 6px !important; padding-left: 12px !important; padding-right: 12px !important; }
             header .w-10.h-10 { width: 24px !important; height: 24px !important; border-radius: 6px !important; }
@@ -154,7 +153,6 @@
             #table-edit-zone button { width: 36px !important; height: 36px !important; border-radius: 12px !important; }
         }
 
-        /* REGLAS DE IMPRESIÓN LIMPIAS */
         @media print {
             header, nav, footer, .no-print, .bg-slate-100, button { display: none !important; }
             .screen-overlay { position: static; display: block; top: 0; background: white !important; padding: 0 !important; }
@@ -795,7 +793,6 @@ Generado por el Sistema de Control SPOT CHECK
         function openModal(id) { document.getElementById(id).classList.replace('hidden', 'flex'); }
         function closeModal(id) { document.getElementById(id).classList.replace('flex', 'hidden'); }
         
-        /* SISTEMA TOAST BLINDADO */
         function showToast(msg, isProcessing = false) {
             if (toastTimeout) clearTimeout(toastTimeout);
             
@@ -810,8 +807,6 @@ Generado por el Sistema de Control SPOT CHECK
             }
             
             t.classList.add('show');
-            
-            // Si no está procesando algo asíncrono largo, se oculta automáticamente a los 2 segundos
             if (!isProcessing) {
                 toastTimeout = setTimeout(() => t.classList.remove('show'), 2000);
             }
@@ -834,7 +829,7 @@ Generado por el Sistema de Control SPOT CHECK
             document.getElementById('ocr-camera-input').click();
         }
 
-        /* ESCÁNER EN SEGUNDO PLANO (ASÍNCRONO COMPLETO) */
+        /* FILTRADO INTELIGENTE TOLERANTE A ERRORES DE IMPRESIÓN Y OCR */
         function processImageOCR(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -845,10 +840,9 @@ Generado por el Sistema de Control SPOT CHECK
             ocrIcon.className = "fa-solid fa-spinner animate-spin text-amber-400 text-sm";
             ocrText.innerText = "LEYENDO...";
             
-            // Cartel persistente en modo 'Procesando...' con icono animado
             showToast("Procesando reporte POS...", true);
 
-            // Dejar plano limpio antes del escaneo
+            // Reseteamos el estado visual de todas las mesas antes de pintar las encontradas
             tables.forEach(t => t.status = 'free');
 
             const reader = new FileReader();
@@ -861,17 +855,16 @@ Generado por el Sistema de Control SPOT CHECK
                     canvas.height = img.height;
                     ctx.drawImage(img, 0, 0);
 
-                    // Binarización optimizada
+                    // Preprocesamiento de contraste binarizado (Mejora la legibilidad del ticket)
                     const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                     const data = imgData.data;
                     for (let i = 0; i < data.length; i += 4) {
                         const brightness = 0.34 * data[i] + 0.5 * data[i + 1] + 0.16 * data[i + 2];
-                        const threshold = brightness < 140 ? 0 : 255; 
+                        const threshold = brightness < 150 ? 0 : 255; 
                         data[i] = data[i+1] = data[i+2] = threshold;
                     }
                     ctx.putImageData(imgData, 0, 0);
 
-                    // Forzar ejecución asíncrona real desvinculando Tesseract del hilo UI inmediato
                     setTimeout(() => {
                         Tesseract.recognize(
                             canvas.toDataURL(),
@@ -879,38 +872,45 @@ Generado por el Sistema de Control SPOT CHECK
                             { logger: m => console.log(m) }
                         ).then(({ data: { text } }) => {
                             
-                            const lines = text.toLowerCase()
-                                              .replace(/tb1/g, 'tbl')
-                                              .replace(/tbi/g, 'tbl')
-                                              .split('\n');
+                            console.log("Texto Crudo OCR Detectado:\n", text);
+
+                            // REGLAS DE NORMALIZACIÓN ULTRA-TOLERANTES:
+                            // Pasamos a minúsculas y reemplazamos fallas clásicas del motor OCR
+                            let cleanText = text.toLowerCase()
+                                                .replace(/tb1/g, 'tbl')
+                                                .replace(/tbi/g, 'tbl')
+                                                .replace(/7bl/g, 'tbl')
+                                                .replace(/tbi/g, 'tbl');
 
                             const detectedNumbers = [];
-                            const strictRegex = /tbl\s(\d+)\//;
-
-                            for (let line of lines) {
-                                const cleanLine = line.replace(/\s+/g, ' ').trim();
-                                const match = strictRegex.exec(cleanLine);
-                                if (match) {
-                                    detectedNumbers.push(match[1]);
-                                }
+                            
+                            // EXPRESIÓN REGULAR MEJORADA:
+                            // tb o tbl -> seguido de cualquier espacio -> número de mesa -> seguido de espacios opcionales y barra de división
+                            const flexibleRegex = /(?:tb|tbl)\s*(\d+)\s*\//g;
+                            
+                            let match;
+                            while ((match = flexibleRegex.exec(cleanText)) !== null) {
+                                // Guardamos el número capturado
+                                detectedNumbers.push(match[1]);
                             }
+
+                            console.log("Números de mesa normalizados y extraídos:", detectedNumbers);
 
                             let matchedCount = 0;
                             tables.forEach(t => {
                                 if (detectedNumbers.includes(t.label)) {
-                                    t.status = 'occupied';
+                                    t.status = 'occupied'; // Se pinta de negro
                                     matchedCount++;
                                 }
                             });
 
-                            // Ocultamos el cartel de procesamiento antes de mandar el de éxito
                             forceHideToast();
                             
                             setTimeout(() => {
                                 if (matchedCount > 0) {
                                     showToast(`Sincronizado: ${matchedCount} mesas`, false);
                                 } else {
-                                    showToast("Sin coincidencias 'Tbl [número]/'", false);
+                                    showToast("No se encontraron mesas ('TBL número/')", false);
                                 }
                             }, 50);
 
