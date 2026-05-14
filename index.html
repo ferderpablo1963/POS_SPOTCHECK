@@ -3,108 +3,200 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
-    <title>SPOT CHECK - OCR OPTIMIZADO</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#020617">
+    <title>SPOT CHECK - CONTROL PROFESIONAL</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <style>
-        body { font-family: sans-serif; background: #0f172a; color: white; }
-        .mesa { width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; border: 2px solid #334155; border-radius: 12px; font-weight: bold; }
-        .occupied { background: #10b981; border-color: #10b981; color: #000; }
+        body { font-family: system-ui, -apple-system, sans-serif; overscroll-behavior: none; background-color: #f8fafc; }
+        #main-scroll { overflow: auto; position: relative; background-color: #e2e8f0; }
+        #map-container { height: 1200px; width: 2000px; position: relative; background-color: #ffffff; transition: transform 0.3s; transform-origin: top left; }
+        .mesa { position: absolute; transform-origin: center center; z-index: 10; display: flex; align-items: center; justify-content: center; font-weight: 800; border-radius: 12px; transition: all 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .mesa-free { background-color: #ffffff; color: #64748b; border: 2px solid #e2e8f0; }
+        .mesa-occupied { background-color: #000000 !important; color: #ffffff !important; border: 2px solid #000000 !important; box-shadow: 0 10px 15px rgba(0,0,0,0.3); }
+        .screen-overlay { position: fixed; left: 0; right: 0; bottom: 0; top: 205px; background-color: #f8fafc; z-index: 30; overflow-y: auto; display: none; padding-bottom: 120px; }
+        .screen-overlay.active { display: flex; }
+        #toast { position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%) translateY(100px); transition: transform 0.3s; z-index: 1000; }
+        #toast.show { transform: translateX(-50%) translateY(0); }
     </style>
 </head>
-<body class="p-4">
+<body class="h-screen flex flex-col overflow-hidden select-none text-slate-900">
 
-    <header class="mb-6">
-        <h1 class="text-xl font-black italic">SPOT CHECK <span class="text-emerald-500 underline">V2</span></h1>
-        <p class="text-[10px] text-slate-400">OPTIMIZADO PARA PANTALLAS POS</p>
+    <header class="bg-slate-950 text-white p-5 pt-12 flex justify-between items-center shrink-0 z-[60]">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center shadow-lg transform -rotate-3">
+                <i class="fa-solid fa-layer-group text-slate-950 text-xl"></i>
+            </div>
+            <div>
+                <h1 class="font-black text-xl italic leading-none">SPOT CHECK</h1>
+                <p class="text-[8px] text-slate-400 font-black tracking-widest uppercase">AUDITORÍA POS</p>
+            </div>
+        </div>
+        <button onclick="toggleLock()" id="lock-btn" class="px-4 py-2 bg-slate-900 rounded-2xl border border-slate-800">
+            <i class="fa-solid fa-lock text-red-500" id="lock-icon"></i>
+        </button>
     </header>
 
-    <div id="plano" class="grid grid-cols-4 gap-4 mb-20">
+    <div class="bg-white border-b px-6 py-3 flex justify-between items-center z-50 shrink-0">
+        <div class="flex gap-4">
+            <div><p class="text-[8px] font-black text-slate-400">MESAS</p><p id="stat-occupied" class="text-sm font-black">0</p></div>
+            <div><p class="text-[8px] font-black text-slate-400">OCUPACIÓN</p><p id="stat-percent" class="text-sm font-black text-emerald-600">0%</p></div>
         </div>
+        <div class="flex items-center gap-2">
+            <input type="file" id="ocr-camera-input" accept="image/*" capture="environment" class="hidden" onchange="processImageOCR(event)">
+            <button onclick="document.getElementById('ocr-camera-input').click()" class="bg-slate-950 text-emerald-400 px-4 py-2 rounded-lg text-[10px] font-black uppercase flex items-center gap-2">
+                <i id="btn-ocr-icon" class="fa-solid fa-camera"></i> <span id="btn-ocr-text">SCAN</span>
+            </button>
+        </div>
+    </div>
 
-    <footer class="fixed bottom-0 left-0 right-0 p-6 bg-slate-900 border-t border-slate-800 flex gap-4">
-        <input type="file" id="cameraInput" accept="image/*" capture="environment" class="hidden" onchange="processPOS(event)">
-        
-        <button onclick="document.getElementById('cameraInput').click()" class="flex-1 bg-emerald-500 text-slate-950 h-16 rounded-2xl font-black flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all">
-            <i class="fa-solid fa-camera"></i> ESCANEAR PANTALLA POS
-        </button>
-        
-        <button onclick="resetAll()" class="w-16 h-16 bg-slate-800 rounded-2xl flex items-center justify-center text-slate-400">
-            ↺
-        </button>
+    <nav class="px-4 py-3 bg-slate-50 flex gap-2 border-b">
+        <div class="flex w-full bg-slate-200/50 p-1 rounded-2xl">
+            <button onclick="setMode('audit')" id="nav-audit" class="flex-1 py-3 rounded-xl font-black text-[10px] uppercase bg-white shadow-sm border-b-2 border-emerald-500">Auditar</button>
+            <button onclick="setMode('history')" id="nav-history" class="flex-1 py-3 rounded-xl font-black text-[10px] uppercase text-slate-400">Historial</button>
+        </div>
+    </nav>
+
+    <main class="flex-1 overflow-hidden relative" id="main-scroll">
+        <div id="map-container">
+            <div id="mesas-layer" class="w-full h-full relative"></div>
+        </div>
+    </main>
+
+    <div id="history-screen" class="screen-overlay flex-col p-6">
+        <h2 class="text-2xl font-black mb-6 italic">HISTORIAL</h2>
+        <div id="history-list" class="space-y-4"></div>
+    </div>
+
+    <footer class="p-6 bg-white border-t z-50">
+        <div id="audit-controls" class="flex gap-3">
+            <button onclick="clearCurrentAudit()" class="w-14 h-14 bg-slate-100 text-slate-400 rounded-2xl flex items-center justify-center">
+                <i class="fa-solid fa-rotate-left"></i>
+            </button>
+            <button onclick="saveAudit()" class="flex-1 bg-emerald-500 text-slate-950 h-14 rounded-3xl font-black uppercase">Guardar Reporte</button>
+        </div>
     </footer>
 
-    <canvas id="prepCanvas" class="hidden"></canvas>
+    <div id="toast" class="bg-slate-900 text-white px-6 py-3 rounded-full font-bold text-xs shadow-2xl">
+        <span id="toast-msg">Mensaje</span>
+    </div>
 
     <script>
-        // Mesas de ejemplo basadas en tu plano
-        let mesas = ["1","2","3","4","5","6","7","8","9","10","11","20","21","22","23","24","25","30","31","32","33","34","40","41","42","43","44"];
-        let occupied = [];
+        const DB_PREFIX = 'spotcheck_pro_v1';
+        let tables = JSON.parse(localStorage.getItem(`${DB_PREFIX}_tables`)) || [];
+        let audits = JSON.parse(localStorage.getItem(`${DB_PREFIX}_audits`)) || [];
+        let isLocked = true;
+        let currentMode = 'audit';
 
-        function render() {
-            const container = document.getElementById('plano');
-            container.innerHTML = mesas.map(m => `
-                <div class="mesa ${occupied.includes(m) ? 'occupied' : ''}">${m}</div>
-            `).join('');
-        }
-
-        function resetAll() {
-            occupied = [];
+        function init() {
+            if (tables.length === 0) createLayout();
             render();
         }
 
-        async function processPOS(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            const btn = event.target.nextElementSibling;
-            const originalText = btn.innerHTML;
-            btn.innerHTML = "PROCESANDO PANTALLA...";
-            btn.style.opacity = "0.5";
-
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                const img = new Image();
-                img.onload = async () => {
-                    // PRE-PROCESAMIENTO PARA MONITORES
-                    const canvas = document.getElementById('prepCanvas');
-                    const ctx = canvas.getContext('2d');
-                    canvas.width = img.width;
-                    canvas.height = img.height;
-                    
-                    // Filtro de contraste y escala de grises para eliminar moiré del monitor
-                    ctx.filter = 'grayscale(1) contrast(200%) brightness(120%)';
-                    ctx.drawImage(img, 0, 0);
-
-                    const { data: { text } } = await Tesseract.recognize(canvas, 'eng');
-                    console.log("Texto Detectado:", text);
-
-                    // LIMPIEZA DE DATOS (Manejando errores típicos de lectura en POS)
-                    const cleanedText = text.toUpperCase()
-                        .replace(/I/g, '1').replace(/L/g, '1') // Confusión común
-                        .replace(/O/g, '0')
-                        .replace(/S/g, '5');
-
-                    // Buscamos "TBL" o números aislados
-                    const matches = cleanedText.match(/\d+/g) || [];
-                    
-                    matches.forEach(num => {
-                        // Solo agregamos si el número existe en nuestro plano de mesas
-                        if (mesas.includes(num)) {
-                            if (!occupied.includes(num)) occupied.push(num);
-                        }
-                    });
-
-                    btn.innerHTML = originalText;
-                    btn.style.opacity = "1";
-                    render();
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
+        function createLayout() {
+            const layout = [
+                { label: "1", x: 1450, y: 150 }, { label: "2", x: 1570, y: 150 }, { label: "3", x: 1690, y: 150 },
+                { label: "8", x: 1820, y: 450 }, { label: "9", x: 1940, y: 450 }, { label: "10", x: 1820, y: 720 },
+                { label: "20", x: 1350, y: 620 }, { label: "21", x: 1470, y: 620 }, { label: "22", x: 1470, y: 780 },
+                { label: "30", x: 950, y: 550 }, { label: "41", x: 180, y: 420 }, { label: "90", x: 500, y: 150 }
+            ];
+            tables = layout.map((t, i) => ({ id: i, ...t, status: 'free', w: 70, h: 70 }));
         }
 
-        render();
+        function render() {
+            const layer = document.getElementById('mesas-layer');
+            layer.innerHTML = '';
+            let count = 0;
+            tables.forEach(t => {
+                if(t.status === 'occupied') count++;
+                const div = document.createElement('div');
+                div.className = `mesa ${t.status === 'occupied' ? 'mesa-occupied' : 'mesa-free'}`;
+                div.style.left = `${t.x}px`; div.style.top = `${t.y}px`;
+                div.style.width = `${t.w}px`; div.style.height = `${t.h}px`;
+                div.innerText = t.label;
+                div.onclick = () => { if(currentMode === 'audit') { t.status = t.status === 'free' ? 'occupied' : 'free'; render(); saveData(); }};
+                layer.appendChild(div);
+            });
+            document.getElementById('stat-occupied').innerText = count;
+            document.getElementById('stat-percent').innerText = Math.round((count / tables.length) * 100) + '%';
+        }
+
+        async function processImageOCR(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const icon = document.getElementById('btn-ocr-icon');
+            icon.className = "fa-solid fa-spinner animate-spin text-amber-400";
+            showToast("Analizando Formato POS...");
+
+            Tesseract.recognize(file, 'eng').then(({ data: { text } }) => {
+                console.log("Texto Detectado:", text);
+                
+                // LÓGICA DE EXTRACCIÓN MEJORADA:
+                // Busca números seguidos de "/" (ej: "90/1") y toma el primer número.
+                const matches = text.match(/(\d+)\s*\/\s*1/g) || [];
+                let detectedMesas = matches.map(m => m.split('/')[0].trim());
+                
+                // También buscamos el formato "Tbl 90"
+                const tblMatches = text.match(/Tbl\s*(\d+)/gi) || [];
+                tblMatches.forEach(m => detectedMesas.push(m.replace(/Tbl\s*/i, '')));
+
+                let found = 0;
+                tables.forEach(t => {
+                    if (detectedMesas.includes(t.label)) {
+                        t.status = 'occupied';
+                        found++;
+                    }
+                });
+
+                showToast(found > 0 ? `Sincronizadas ${found} mesas` : "No se detectaron mesas claras");
+                render(); saveData();
+            }).finally(() => {
+                icon.className = "fa-solid fa-camera";
+            });
+        }
+
+        function setMode(m) {
+            currentMode = m;
+            document.getElementById('history-screen').classList.toggle('active', m === 'history');
+            if(m === 'history') renderHistory();
+            render();
+        }
+
+        function saveAudit() {
+            const occupied = tables.filter(t => t.status === 'occupied').map(t => t.label);
+            audits.unshift({ id: Date.now(), date: new Date().toLocaleString(), count: occupied.length, list: occupied.join(', ') });
+            saveData(); showToast("Guardado en Historial");
+            tables.forEach(t => t.status = 'free'); render();
+        }
+
+        function renderHistory() {
+            document.getElementById('history-list').innerHTML = audits.map(a => `
+                <div class="bg-white p-4 rounded-2xl border border-slate-200">
+                    <p class="text-[10px] font-bold text-slate-400 uppercase">${a.date}</p>
+                    <p class="font-black text-lg">MESAS ACTIVAS: ${a.count}</p>
+                    <p class="text-xs text-slate-600">ID: ${a.list || 'Ninguna'}</p>
+                </div>
+            `).join('') || '<p class="text-center py-10 text-slate-400">Sin registros</p>';
+        }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            document.getElementById('toast-msg').innerText = msg;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 2000);
+        }
+
+        function toggleLock() { isLocked = !isLocked; showToast(isLocked ? "Modo Audit" : "Modo Edición"); }
+        function clearCurrentAudit() { if(confirm("¿Limpiar todo?")) { tables.forEach(t => t.status = 'free'); render(); saveData(); }}
+        function saveData() {
+            localStorage.setItem(`${DB_PREFIX}_tables`, JSON.stringify(tables));
+            localStorage.setItem(`${DB_PREFIX}_audits`, JSON.stringify(audits));
+        }
+
+        init();
     </script>
 </body>
 </html>
