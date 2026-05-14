@@ -170,6 +170,7 @@
     </div>
 
     <script>
+        // TODA TU LÓGICA DE DATOS MANTENIDA
         const DB_PREFIX = 'spotcheck_v3';
         let tables = JSON.parse(localStorage.getItem(`${DB_PREFIX}_tables`)) || [];
         let audits = JSON.parse(localStorage.getItem(`${DB_PREFIX}_audits`)) || [];
@@ -216,7 +217,7 @@
             document.getElementById('stat-percent').innerText = tables.length ? Math.round((count/tables.length)*100)+'%' : '0%';
         }
 
-        // --- FUNCIÓN DE ESCANEO RECONSTRUIDA ---
+        // --- MOTOR DE ESCANEO AÑADIDO ---
         async function processImageOCR(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -231,28 +232,22 @@
                 const img = new Image();
                 img.onload = () => {
                     Tesseract.recognize(img, 'eng').then(({ data: { text } }) => {
-                        // 1. Limpiar todas las mesas primero
+                        // Limpiar mesas previas
                         tables.forEach(t => t.status = 'free');
 
-                        // 2. Extraer números del ticket (Busca números seguidos de "/ 1")
-                        const lines = text.split('\n');
-                        const detectedNumbers = [];
-                        
-                        lines.forEach(line => {
-                            const match = line.match(/(\d+)\s*\/\s*1/);
-                            if (match) detectedNumbers.push(match[1]);
-                        });
+                        // Lógica de detección: busca números seguidos de / 1 (Micro/POS)
+                        const matches = text.match(/(\d+)\s*\/\s*1/g) || [];
+                        const detected = matches.map(m => m.split('/')[0].trim());
 
-                        // 3. Emparejar con mesas existentes
-                        let matched = 0;
+                        let matchedCount = 0;
                         tables.forEach(t => {
-                            if (detectedNumbers.includes(t.label)) {
+                            if (detected.includes(t.label)) {
                                 t.status = 'occupied';
-                                matched++;
+                                matchedCount++;
                             }
                         });
 
-                        showToast(matched > 0 ? `Sincronizadas ${matched} mesas` : "No se detectaron mesas");
+                        showToast(matchedCount > 0 ? `Sincronizadas ${matchedCount} mesas` : "No se detectaron mesas");
                         render();
                         saveData();
                     }).finally(() => {
