@@ -6,20 +6,24 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#020617">
+    
     <title>SPOT CHECK - CONTROL PROFESIONAL</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    
     <style>
         body { font-family: system-ui, -apple-system, sans-serif; overscroll-behavior: none; background-color: #f8fafc; }
+        input, textarea { user-select: text !important; -webkit-user-select: text !important; }
         #main-scroll { overflow: auto; position: relative; background-color: #e2e8f0; }
-        #map-container { height: 1200px; width: 2000px; position: relative; background-color: #ffffff; transition: transform 0.3s; transform-origin: top left; }
-        .mesa { position: absolute; transform-origin: center center; z-index: 10; display: flex; align-items: center; justify-content: center; font-weight: 800; border-radius: 12px; transition: all 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        #map-container { height: 1200px; width: 2000px; position: relative; background-color: #ffffff; transform-origin: top left; }
+        .design-grid { background-image: radial-gradient(#cbd5e1 1px, transparent 1px); background-size: 30px 30px; }
+        .mesa { position: absolute; transform-origin: center center; z-index: 10; display: flex; align-items: center; justify-content: center; font-weight: 800; border-radius: 12px; transition: all 0.2s; cursor: pointer; }
         .mesa-free { background-color: #ffffff; color: #64748b; border: 2px solid #e2e8f0; }
-        .mesa-occupied { background-color: #000000 !important; color: #ffffff !important; border: 2px solid #000000 !important; box-shadow: 0 10px 15px rgba(0,0,0,0.3); }
-        .screen-overlay { position: fixed; left: 0; right: 0; bottom: 0; top: 205px; background-color: #f8fafc; z-index: 30; overflow-y: auto; display: none; padding-bottom: 120px; }
+        .mesa-occupied { background-color: #000000 !important; color: #ffffff !important; border: 2px solid #000000 !important; }
+        .screen-overlay { position: fixed; left: 0; right: 0; bottom: 0; top: 205px; background-color: #f8fafc; z-index: 30; overflow-y: auto; display: none; padding-bottom: 140px; }
         .screen-overlay.active { display: flex; }
-        #toast { position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%) translateY(100px); transition: transform 0.3s; z-index: 1000; }
+        #toast { position: fixed; bottom: 140px; left: 50%; transform: translateX(-50%) translateY(100px); transition: transform 0.2s; z-index: 1000; }
         #toast.show { transform: translateX(-50%) translateY(0); }
     </style>
 </head>
@@ -40,22 +44,19 @@
         </button>
     </header>
 
-    <div class="bg-white border-b px-6 py-3 flex justify-between items-center z-50 shrink-0">
+    <div class="bg-white border-b px-6 py-3 flex justify-between items-center z-50">
         <div class="flex gap-4">
             <div><p class="text-[8px] font-black text-slate-400">MESAS</p><p id="stat-occupied" class="text-sm font-black">0</p></div>
             <div><p class="text-[8px] font-black text-slate-400">OCUPACIÓN</p><p id="stat-percent" class="text-sm font-black text-emerald-600">0%</p></div>
         </div>
-        <div class="flex items-center gap-2">
-            <input type="file" id="ocr-camera-input" accept="image/*" capture="environment" class="hidden" onchange="processImageOCR(event)">
-            <button onclick="document.getElementById('ocr-camera-input').click()" class="bg-slate-950 text-emerald-400 px-4 py-2 rounded-lg text-[10px] font-black uppercase flex items-center gap-2">
-                <i id="btn-ocr-icon" class="fa-solid fa-camera"></i> <span id="btn-ocr-text">SCAN</span>
-            </button>
-        </div>
+        <input type="file" id="ocr-camera-input" accept="image/*" capture="environment" class="hidden" onchange="processImageOCR(event)">
+        <p id="current-time" class="text-[10px] font-black uppercase">00:00</p>
     </div>
 
-    <nav class="px-4 py-3 bg-slate-50 flex gap-2 border-b">
+    <nav class="px-4 py-3 bg-slate-50 flex gap-2 border-b shrink-0">
         <div class="flex w-full bg-slate-200/50 p-1 rounded-2xl">
-            <button onclick="setMode('audit')" id="nav-audit" class="flex-1 py-3 rounded-xl font-black text-[10px] uppercase bg-white shadow-sm border-b-2 border-emerald-500">Auditar</button>
+            <button onclick="setMode('audit')" id="nav-audit" class="flex-1 py-3 rounded-xl font-black text-[10px] uppercase bg-white shadow-sm">Auditar</button>
+            <button onclick="setMode('design')" id="nav-design" class="flex-1 py-3 rounded-xl font-black text-[10px] uppercase text-slate-400">Diseño</button>
             <button onclick="setMode('history')" id="nav-history" class="flex-1 py-3 rounded-xl font-black text-[10px] uppercase text-slate-400">Historial</button>
         </div>
     </nav>
@@ -71,13 +72,18 @@
         <div id="history-list" class="space-y-4"></div>
     </div>
 
-    <footer class="p-6 bg-white border-t z-50">
-        <div id="audit-controls" class="flex gap-3">
-            <button onclick="clearCurrentAudit()" class="w-14 h-14 bg-slate-100 text-slate-400 rounded-2xl flex items-center justify-center">
-                <i class="fa-solid fa-rotate-left"></i>
-            </button>
-            <button onclick="saveAudit()" class="flex-1 bg-emerald-500 text-slate-950 h-14 rounded-3xl font-black uppercase">Guardar Reporte</button>
-        </div>
+    <footer class="fixed bottom-0 left-0 right-0 p-6 bg-white border-t border-slate-100 flex gap-3 z-[100]">
+        <button onclick="clearCurrentAudit()" class="w-14 h-14 bg-slate-100 text-slate-400 rounded-2xl flex items-center justify-center active:scale-90 transition-transform">
+            <i class="fa-solid fa-rotate-left"></i>
+        </button>
+        
+        <button onclick="document.getElementById('ocr-camera-input').click()" class="flex-1 bg-slate-950 text-emerald-400 h-14 rounded-3xl font-black uppercase flex items-center justify-center gap-2 shadow-xl active:scale-95 transition-all">
+            <i id="ocr-icon" class="fa-solid fa-camera"></i> <span id="ocr-text">SCAN POS</span>
+        </button>
+        
+        <button onclick="saveAudit()" class="flex-1 bg-emerald-500 text-slate-950 h-14 rounded-3xl font-black uppercase shadow-lg shadow-emerald-200 active:scale-95 transition-all">
+            Guardar
+        </button>
     </footer>
 
     <div id="toast" class="bg-slate-900 text-white px-6 py-3 rounded-full font-bold text-xs shadow-2xl">
@@ -85,101 +91,139 @@
     </div>
 
     <script>
-        const DB_PREFIX = 'spotcheck_pro_v1';
+        const DB_PREFIX = 'spotcheck_v3';
         let tables = JSON.parse(localStorage.getItem(`${DB_PREFIX}_tables`)) || [];
         let audits = JSON.parse(localStorage.getItem(`${DB_PREFIX}_audits`)) || [];
         let isLocked = true;
         let currentMode = 'audit';
 
         function init() {
-            if (tables.length === 0) createLayout();
             render();
+            updateTime();
+            setInterval(updateTime, 1000);
         }
 
-        function createLayout() {
-            const layout = [
-                { label: "1", x: 1450, y: 150 }, { label: "2", x: 1570, y: 150 }, { label: "3", x: 1690, y: 150 },
-                { label: "8", x: 1820, y: 450 }, { label: "9", x: 1940, y: 450 }, { label: "10", x: 1820, y: 720 },
-                { label: "20", x: 1350, y: 620 }, { label: "21", x: 1470, y: 620 }, { label: "22", x: 1470, y: 780 },
-                { label: "30", x: 950, y: 550 }, { label: "41", x: 180, y: 420 }, { label: "90", x: 500, y: 150 }
-            ];
-            tables = layout.map((t, i) => ({ id: i, ...t, status: 'free', w: 70, h: 70 }));
+        function updateTime() {
+            document.getElementById('current-time').innerText = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
         }
 
         function render() {
             const layer = document.getElementById('mesas-layer');
             layer.innerHTML = '';
-            let count = 0;
+            let occupiedCount = 0;
+
             tables.forEach(t => {
-                if(t.status === 'occupied') count++;
+                if(t.status === 'occupied') occupiedCount++;
                 const div = document.createElement('div');
                 div.className = `mesa ${t.status === 'occupied' ? 'mesa-occupied' : 'mesa-free'}`;
-                div.style.left = `${t.x}px`; div.style.top = `${t.y}px`;
-                div.style.width = `${t.w}px`; div.style.height = `${t.h}px`;
+                div.style.left = `${t.x}px`;
+                div.style.top = `${t.y}px`;
+                div.style.width = `${t.w}px`;
+                div.style.height = `${t.h}px`;
                 div.innerText = t.label;
-                div.onclick = () => { if(currentMode === 'audit') { t.status = t.status === 'free' ? 'occupied' : 'free'; render(); saveData(); }};
+                
+                div.onclick = () => {
+                    if(currentMode === 'audit') {
+                        t.status = t.status === 'free' ? 'occupied' : 'free';
+                        render();
+                        saveData();
+                    }
+                };
                 layer.appendChild(div);
             });
-            document.getElementById('stat-occupied').innerText = count;
-            document.getElementById('stat-percent').innerText = Math.round((count / tables.length) * 100) + '%';
+
+            document.getElementById('stat-occupied').innerText = occupiedCount;
+            document.getElementById('stat-percent').innerText = Math.round((occupiedCount / (tables.length || 1)) * 100) + '%';
         }
 
         async function processImageOCR(event) {
             const file = event.target.files[0];
             if (!file) return;
-            const icon = document.getElementById('btn-ocr-icon');
-            icon.className = "fa-solid fa-spinner animate-spin text-amber-400";
-            showToast("Analizando Formato POS...");
+
+            const ocrIcon = document.getElementById('ocr-icon');
+            const ocrText = document.getElementById('ocr-text');
+            ocrIcon.className = "fa-solid fa-spinner animate-spin text-emerald-400";
+            ocrText.innerText = "LEYENDO...";
 
             Tesseract.recognize(file, 'eng').then(({ data: { text } }) => {
-                console.log("Texto Detectado:", text);
+                console.log("OCR Crudo:", text);
                 
-                // LÓGICA DE EXTRACCIÓN MEJORADA:
-                // Busca números seguidos de "/" (ej: "90/1") y toma el primer número.
+                // NUEVA LÓGICA BASADA EN TU POS: Busca números antes de la barra "/"
+                // Ejemplo: "90/1" -> detecta "90"
                 const matches = text.match(/(\d+)\s*\/\s*1/g) || [];
-                let detectedMesas = matches.map(m => m.split('/')[0].trim());
-                
-                // También buscamos el formato "Tbl 90"
-                const tblMatches = text.match(/Tbl\s*(\d+)/gi) || [];
-                tblMatches.forEach(m => detectedMesas.push(m.replace(/Tbl\s*/i, '')));
+                let detectedNumbers = matches.map(m => m.split('/')[0].trim());
 
-                let found = 0;
+                let matchedCount = 0;
                 tables.forEach(t => {
-                    if (detectedMesas.includes(t.label)) {
+                    if (detectedNumbers.includes(t.label)) {
                         t.status = 'occupied';
-                        found++;
+                        matchedCount++;
                     }
                 });
 
-                showToast(found > 0 ? `Sincronizadas ${found} mesas` : "No se detectaron mesas claras");
-                render(); saveData();
+                showToast(matchedCount > 0 ? `Sincronizadas ${matchedCount} mesas` : "No se detectaron mesas claras");
+                render();
+                saveData();
             }).finally(() => {
-                icon.className = "fa-solid fa-camera";
+                ocrIcon.className = "fa-solid fa-camera";
+                ocrText.innerText = "SCAN POS";
             });
         }
 
         function setMode(m) {
             currentMode = m;
+            const navs = ['audit', 'design', 'history'];
+            navs.forEach(n => {
+                const btn = document.getElementById(`nav-${n}`);
+                btn.className = n === m ? "flex-1 py-3 rounded-xl font-black text-[10px] uppercase bg-white shadow-sm" : "flex-1 py-3 rounded-xl font-black text-[10px] uppercase text-slate-400";
+            });
+
+            document.getElementById('map-container').className = m === 'design' ? "design-grid" : "";
             document.getElementById('history-screen').classList.toggle('active', m === 'history');
             if(m === 'history') renderHistory();
             render();
         }
 
+        function toggleLock() {
+            isLocked = !isLocked;
+            const icon = document.getElementById('lock-icon');
+            icon.className = isLocked ? "fa-solid fa-lock text-red-500" : "fa-solid fa-lock-open text-emerald-500";
+            showToast(isLocked ? "Mapa bloqueado" : "Modo edición activado");
+        }
+
         function saveAudit() {
             const occupied = tables.filter(t => t.status === 'occupied').map(t => t.label);
-            audits.unshift({ id: Date.now(), date: new Date().toLocaleString(), count: occupied.length, list: occupied.join(', ') });
-            saveData(); showToast("Guardado en Historial");
-            tables.forEach(t => t.status = 'free'); render();
+            if(occupied.length === 0) { showToast("No hay mesas ocupadas"); return; }
+            
+            audits.unshift({
+                id: Date.now(),
+                date: new Date().toLocaleString(),
+                count: occupied.length,
+                details: occupied.join(', ')
+            });
+            saveData();
+            showToast("Reporte guardado");
+            tables.forEach(t => t.status = 'free');
+            render();
         }
 
         function renderHistory() {
-            document.getElementById('history-list').innerHTML = audits.map(a => `
+            const list = document.getElementById('history-list');
+            list.innerHTML = audits.map(a => `
                 <div class="bg-white p-4 rounded-2xl border border-slate-200">
                     <p class="text-[10px] font-bold text-slate-400 uppercase">${a.date}</p>
-                    <p class="font-black text-lg">MESAS ACTIVAS: ${a.count}</p>
-                    <p class="text-xs text-slate-600">ID: ${a.list || 'Ninguna'}</p>
+                    <p class="font-black text-lg text-slate-900">MESAS: ${a.count}</p>
+                    <p class="text-xs text-slate-500 font-medium leading-relaxed">${a.details}</p>
                 </div>
-            `).join('') || '<p class="text-center py-10 text-slate-400">Sin registros</p>';
+            `).join('') || '<p class="text-center text-slate-400 py-10">Sin historial</p>';
+        }
+
+        function clearCurrentAudit() {
+            if(confirm("¿Limpiar la auditoría actual?")) {
+                tables.forEach(t => t.status = 'free');
+                render();
+                saveData();
+            }
         }
 
         function showToast(msg) {
@@ -189,8 +233,6 @@
             setTimeout(() => t.classList.remove('show'), 2000);
         }
 
-        function toggleLock() { isLocked = !isLocked; showToast(isLocked ? "Modo Audit" : "Modo Edición"); }
-        function clearCurrentAudit() { if(confirm("¿Limpiar todo?")) { tables.forEach(t => t.status = 'free'); render(); saveData(); }}
         function saveData() {
             localStorage.setItem(`${DB_PREFIX}_tables`, JSON.stringify(tables));
             localStorage.setItem(`${DB_PREFIX}_audits`, JSON.stringify(audits));
