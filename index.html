@@ -10,6 +10,7 @@
     <title>SPOT CHECK - CONTROL PROFESIONAL</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     
     <style>
@@ -19,22 +20,33 @@
             -webkit-tap-highlight-color: transparent; 
             background-color: #f8fafc;
         }
+        
+        input, textarea {
+            user-select: text !important;
+            -webkit-user-select: text !important;
+            touch-action: auto !important;
+        }
+        
         #main-scroll {
             overflow: auto;
             position: relative;
             background-color: #e2e8f0;
             -webkit-overflow-scrolling: touch;
         }
+
         #map-container { 
             height: 1200px; 
             width: 2000px;
             position: relative;
             background-color: #ffffff;
+            transition: all 0.3s ease;
         }
+
         .design-grid {
             background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
             background-size: 30px 30px;
         }
+
         .mesa {
             position: absolute;
             z-index: 10;
@@ -43,13 +55,18 @@
             justify-content: center;
             font-weight: 800;
             border-radius: 12px;
-            transition: all 0.2s;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
             cursor: pointer;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            user-select: none;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: -0.025em;
         }
+
         .mesa-free { background-color: #ffffff; color: #64748b; border: 2px solid #e2e8f0; }
-        .mesa-occupied { background-color: #000000 !important; color: #ffffff !important; border: 2px solid #000000 !important; }
-        
+        .mesa-occupied { background-color: #000000 !important; color: #ffffff !important; border: 2px solid #000000 !important; transform: scale(1.05); z-index: 20; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2); }
+
         .screen-overlay {
             position: fixed;
             left: 0;
@@ -73,13 +90,14 @@
             z-index: 1000;
         }
         #toast.show { transform: translateX(-50%) translateY(0); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
     </style>
 </head>
 <body class="h-screen flex flex-col overflow-hidden select-none text-slate-900">
 
-    <header class="bg-slate-950 text-white p-5 pt-12 flex justify-between items-center shrink-0 z-[60] shadow-2xl">
+    <header class="bg-slate-950 text-white p-5 pt-12 flex justify-between items-center shrink-0 z-[60] shadow-2xl border-b border-slate-800">
         <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center shadow-lg transform -rotate-3">
+            <div class="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20 transform -rotate-3">
                 <i class="fa-solid fa-layer-group text-slate-950 text-xl"></i>
             </div>
             <div>
@@ -87,7 +105,7 @@
                 <p class="text-[8px] text-slate-400 font-black tracking-widest uppercase mt-1">Professional Control</p>
             </div>
         </div>
-        <button onclick="toggleLock()" class="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center border border-slate-800">
+        <button onclick="toggleLock()" class="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center border border-slate-800 active:scale-90 transition-transform">
             <i class="fa-solid fa-lock text-red-500" id="lock-icon"></i>
         </button>
     </header>
@@ -95,22 +113,24 @@
     <div class="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center z-50 shadow-sm shrink-0">
         <div class="flex gap-6">
             <div class="flex flex-col">
-                <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest">Ocupadas</span>
-                <span id="stat-occupied" class="text-xl font-black">0</span>
+                <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Ocupadas</span>
+                <span id="stat-occupied" class="text-xl font-black leading-none">0</span>
             </div>
-            <div class="flex flex-col border-l pl-6">
-                <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest">Ratio</span>
-                <span id="stat-percent" class="text-xl font-black text-emerald-600">0%</span>
+            <div class="flex flex-col border-l border-slate-100 pl-6">
+                <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Ratio</span>
+                <span id="stat-percent" class="text-xl font-black leading-none text-emerald-600">0%</span>
             </div>
         </div>
-        <p id="current-time" class="text-[10px] font-black uppercase text-slate-950">00:00:00</p>
+        <div class="text-right">
+            <p id="current-time" class="text-[10px] font-black text-slate-950 uppercase tracking-tighter">00:00:00</p>
+        </div>
     </div>
 
-    <nav class="px-4 py-3 bg-slate-50 flex gap-2 border-b border-slate-200 shrink-0">
-        <div class="flex w-full bg-slate-200/50 p-1 rounded-2xl">
-            <button onclick="setMode('audit')" id="nav-audit" class="flex-1 py-3 rounded-xl font-black text-[10px] uppercase bg-white shadow-sm">Auditar</button>
-            <button onclick="setMode('design')" id="nav-design" class="flex-1 py-3 rounded-xl font-black text-[10px] uppercase text-slate-400">Diseño</button>
-            <button onclick="setMode('history')" id="nav-history" class="flex-1 py-3 rounded-xl font-black text-[10px] uppercase text-slate-400">Historial</button>
+    <nav class="px-4 py-3 bg-slate-50 flex gap-2 border-b border-slate-200 shrink-0 overflow-x-auto no-scrollbar">
+        <div class="flex w-full bg-slate-200/50 p-1 rounded-2xl backdrop-blur-md">
+            <button onclick="setMode('audit')" id="nav-audit" class="flex-1 py-3 rounded-xl font-black text-[10px] uppercase transition-all duration-200 bg-white shadow-sm text-slate-900">Auditar</button>
+            <button onclick="setMode('design')" id="nav-design" class="flex-1 py-3 rounded-xl font-black text-[10px] uppercase transition-all duration-200 text-slate-400">Diseño</button>
+            <button onclick="setMode('history')" id="nav-history" class="flex-1 py-3 rounded-xl font-black text-[10px] uppercase transition-all duration-200 text-slate-400">Historial</button>
         </div>
     </nav>
 
@@ -121,6 +141,10 @@
     </main>
 
     <div id="history-screen" class="screen-overlay flex-col p-6">
+        <div class="flex justify-between items-center mb-8">
+            <h2 class="text-3xl font-black italic tracking-tighter text-slate-950">HISTORIAL<span class="text-emerald-500 text-4xl">.</span></h2>
+            <button onclick="clearHistory()" class="text-[10px] font-black uppercase text-red-500 border-b-2 border-red-500/20 pb-1">Borrar Todo</button>
+        </div>
         <div id="history-list" class="space-y-4"></div>
     </div>
 
@@ -131,16 +155,16 @@
         
         <input type="file" id="ocr-camera-input" accept="image/*" capture="environment" class="hidden" onchange="processImageOCR(event)">
         
-        <button onclick="document.getElementById('ocr-camera-input').click()" class="flex-1 bg-slate-950 text-emerald-400 h-14 rounded-3xl font-black uppercase flex items-center justify-center gap-2 shadow-2xl active:scale-95 transition-all">
-            <i id="ocr-icon" class="fa-solid fa-camera text-xs"></i> <span id="ocr-text">SCAN POS</span>
+        <button onclick="document.getElementById('ocr-camera-input').click()" class="flex-1 bg-slate-950 text-emerald-400 h-14 rounded-3xl font-black uppercase flex items-center justify-center gap-2 shadow-2xl shadow-slate-950/20 active:scale-95 transition-all">
+            <i id="ocr-icon" class="fa-solid fa-camera text-xs"></i> <span id="ocr-text">SCAN</span>
         </button>
         
-        <button onclick="saveAudit()" class="flex-1 bg-emerald-500 text-slate-950 h-14 rounded-3xl font-black uppercase shadow-xl active:scale-95 transition-all">
+        <button onclick="saveAudit()" class="flex-1 bg-emerald-500 text-slate-950 h-14 rounded-3xl font-black uppercase shadow-xl shadow-emerald-500/20 active:scale-95 transition-all">
             Guardar
         </button>
     </footer>
 
-    <div id="toast" class="bg-slate-950 text-white px-8 py-4 rounded-3xl font-bold text-xs shadow-2xl flex items-center gap-3">
+    <div id="toast" class="bg-slate-950 text-white px-8 py-4 rounded-3xl font-bold text-xs shadow-2xl flex items-center gap-3 border border-slate-800">
         <div class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
         <span id="toast-msg">Mensaje</span>
     </div>
@@ -156,11 +180,15 @@
             render();
             updateTime();
             setInterval(updateTime, 1000);
-            const container = document.getElementById('main-scroll');
-            container.scrollLeft = 850; container.scrollTop = 400;
+            const scrollContainer = document.getElementById('main-scroll');
+            scrollContainer.scrollLeft = 850;
+            scrollContainer.scrollTop = 400;
         }
 
-        function updateTime() { document.getElementById('current-time').innerText = new Date().toTimeString().split(' ')[0]; }
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('current-time').innerText = now.toTimeString().split(' ')[0];
+        }
 
         function render() {
             const layer = document.getElementById('mesas-layer');
@@ -170,16 +198,25 @@
                 if(t.status === 'occupied') count++;
                 const div = document.createElement('div');
                 div.className = `mesa ${t.status === 'occupied' ? 'mesa-occupied' : 'mesa-free'}`;
-                div.style.left = t.x + 'px'; div.style.top = t.y + 'px';
-                div.style.width = t.w + 'px'; div.style.height = t.h + 'px';
+                div.style.left = t.x + 'px';
+                div.style.top = t.y + 'px';
+                div.style.width = t.w + 'px';
+                div.style.height = t.h + 'px';
                 div.innerText = t.label;
-                div.onclick = () => { if(currentMode === 'audit') { t.status = t.status === 'free' ? 'occupied' : 'free'; render(); saveData(); } };
+                div.onclick = () => {
+                    if(currentMode === 'audit') {
+                        t.status = t.status === 'free' ? 'occupied' : 'free';
+                        render();
+                        saveData();
+                    }
+                };
                 layer.appendChild(div);
             });
             document.getElementById('stat-occupied').innerText = count;
             document.getElementById('stat-percent').innerText = tables.length ? Math.round((count/tables.length)*100)+'%' : '0%';
         }
 
+        // --- FUNCIÓN DE ESCANEO RECONSTRUIDA ---
         async function processImageOCR(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -194,26 +231,33 @@
                 const img = new Image();
                 img.onload = () => {
                     Tesseract.recognize(img, 'eng').then(({ data: { text } }) => {
-                        // Resetear mapa antes de procesar
+                        // 1. Limpiar todas las mesas primero
                         tables.forEach(t => t.status = 'free');
 
-                        // Capturar números antes del "/ 1" (Formato POS)
-                        const matches = text.match(/(\d+)\s*\/\s*1/g) || [];
-                        const detected = matches.map(m => m.split('/')[0].trim());
+                        // 2. Extraer números del ticket (Busca números seguidos de "/ 1")
+                        const lines = text.split('\n');
+                        const detectedNumbers = [];
+                        
+                        lines.forEach(line => {
+                            const match = line.match(/(\d+)\s*\/\s*1/);
+                            if (match) detectedNumbers.push(match[1]);
+                        });
 
+                        // 3. Emparejar con mesas existentes
                         let matched = 0;
                         tables.forEach(t => {
-                            if(detected.includes(t.label)) {
+                            if (detectedNumbers.includes(t.label)) {
                                 t.status = 'occupied';
                                 matched++;
                             }
                         });
 
                         showToast(matched > 0 ? `Sincronizadas ${matched} mesas` : "No se detectaron mesas");
-                        render(); saveData();
+                        render();
+                        saveData();
                     }).finally(() => {
                         icon.className = "fa-solid fa-camera text-xs";
-                        textSpan.innerText = "SCAN POS";
+                        textSpan.innerText = "SCAN";
                         document.getElementById('ocr-camera-input').value = "";
                     });
                 };
@@ -224,7 +268,7 @@
 
         function saveAudit() {
             const occupied = tables.filter(t => t.status === 'occupied').map(t => t.label);
-            if(!occupied.length) return showToast("No hay mesas marcadas");
+            if(!occupied.length) return showToast("No hay mesas ocupadas");
             
             const now = new Date();
             const report = {
@@ -244,19 +288,22 @@
         function renderHistory() {
             const list = document.getElementById('history-list');
             list.innerHTML = audits.map(a => `
-                <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm font-mono text-[11px] uppercase leading-tight">
-                    REPORTE (Open Checks): ${a.date} ${a.time}<br>
-                    MESAS REGISTRADAS: ${a.count}<br>
-                    DETALLE POS: ${a.details}<br><br>
-                    FIRMA: ____________________
+                <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm leading-relaxed font-mono text-[11px] uppercase">
+                    CONTROL: ${a.date} ${a.time}<br>
+                    MESAS POS: ${a.count}<br>
+                    DETALLE: ${a.details}<br><br>
+                    Firma: ____________________
                 </div>
-            `).join('') || '<p class="text-center py-10 opacity-40 uppercase font-black">Sin Historial</p>';
+            `).join('') || '<p class="text-center py-10 opacity-30 font-black">SIN REGISTROS</p>';
         }
 
         function setMode(m) {
             currentMode = m;
             ['audit', 'design', 'history'].forEach(id => {
-                document.getElementById('nav-'+id).className = m === id ? "flex-1 py-3 rounded-xl font-black text-[10px] uppercase bg-white shadow-sm text-slate-950" : "flex-1 py-3 rounded-xl font-black text-[10px] uppercase text-slate-400";
+                const btn = document.getElementById('nav-'+id);
+                btn.className = m === id ? 
+                    "flex-1 py-3 rounded-xl font-black text-[10px] uppercase transition-all duration-200 bg-white shadow-sm text-slate-900" : 
+                    "flex-1 py-3 rounded-xl font-black text-[10px] uppercase transition-all duration-200 text-slate-400";
             });
             document.getElementById('map-container').className = m === 'design' ? "design-grid" : "";
             document.getElementById('history-screen').classList.toggle('active', m === 'history');
@@ -267,7 +314,7 @@
         function toggleLock() {
             isLocked = !isLocked;
             document.getElementById('lock-icon').className = isLocked ? "fa-solid fa-lock text-red-500" : "fa-solid fa-lock-open text-emerald-500";
-            showToast(isLocked ? "Mapa Bloqueado" : "Modo Edición");
+            showToast(isLocked ? "Mapa Bloqueado" : "Edición Libre");
         }
 
         function showToast(msg) {
@@ -282,7 +329,15 @@
             localStorage.setItem(`${DB_PREFIX}_audits`, JSON.stringify(audits));
         }
 
-        function clearCurrentAudit() { if(confirm("¿Limpiar mesas actuales?")) { tables.forEach(t => t.status = 'free'); render(); saveData(); } }
+        function clearCurrentAudit() {
+            if(confirm("¿Limpiar mesas actuales?")) {
+                tables.forEach(t => t.status = 'free');
+                render();
+                saveData();
+            }
+        }
+
+        function clearHistory() { if(confirm("¿Borrar todo el historial?")) { audits = []; saveData(); renderHistory(); } }
 
         init();
     </script>
