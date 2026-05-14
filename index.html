@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#020617">
@@ -16,31 +16,28 @@
         body { 
             font-family: system-ui, -apple-system, sans-serif; 
             overscroll-behavior: none; 
+            -webkit-tap-highlight-color: transparent; 
             background-color: #f8fafc;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
         }
-        
-        /* Contenedor principal de scroll para el mapa */
         #main-scroll {
-            flex: 1;
             overflow: auto;
             position: relative;
             background-color: #e2e8f0;
-            z-index: 10;
+            -webkit-overflow-scrolling: touch;
         }
-
         #map-container { 
             height: 1200px; 
             width: 2000px;
             position: relative;
             background-color: #ffffff;
         }
-
+        .design-grid {
+            background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+            background-size: 30px 30px;
+        }
         .mesa {
             position: absolute;
-            z-index: 20;
+            z-index: 10;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -52,107 +49,104 @@
         }
         .mesa-free { background-color: #ffffff; color: #64748b; border: 2px solid #e2e8f0; }
         .mesa-occupied { background-color: #000000 !important; color: #ffffff !important; border: 2px solid #000000 !important; }
-
-        /* Pantallas de Historial/Diseño por encima del mapa pero debajo del footer */
+        
         .screen-overlay {
             position: fixed;
             left: 0;
             right: 0;
-            bottom: 80px; /* Espacio para el footer */
-            top: 190px;   /* Debajo del Nav */
+            bottom: 0;
+            top: 205px;
             background-color: #f8fafc;
-            z-index: 40;
+            z-index: 30;
             overflow-y: auto;
             display: none;
-            padding: 20px;
+            padding-bottom: 140px;
         }
-        .screen-overlay.active { display: block; }
+        .screen-overlay.active { display: flex; }
 
-        /* Toast de mensajes */
         #toast {
             position: fixed;
-            bottom: 100px;
+            bottom: 140px;
             left: 50%;
             transform: translateX(-50%) translateY(100px);
-            transition: transform 0.3s ease;
-            z-index: 2000;
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 1000;
         }
         #toast.show { transform: translateX(-50%) translateY(0); }
     </style>
 </head>
-<body class="overflow-hidden select-none">
+<body class="h-screen flex flex-col overflow-hidden select-none text-slate-900">
 
-    <header class="bg-slate-950 text-white p-4 pt-10 flex justify-between items-center shrink-0 z-[100]">
+    <header class="bg-slate-950 text-white p-5 pt-12 flex justify-between items-center shrink-0 z-[60] shadow-2xl">
         <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center">
-                <i class="fa-solid fa-layer-group text-slate-950"></i>
+            <div class="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center shadow-lg transform -rotate-3">
+                <i class="fa-solid fa-layer-group text-slate-950 text-xl"></i>
             </div>
             <div>
-                <h1 class="font-black text-lg italic leading-none">SPOT CHECK</h1>
-                <p class="text-[8px] text-slate-400 uppercase tracking-widest">Control Profesional</p>
+                <h1 class="font-black text-xl italic leading-none tracking-tighter">SPOT CHECK</h1>
+                <p class="text-[8px] text-slate-400 font-black tracking-widest uppercase mt-1">Professional Control</p>
             </div>
         </div>
-        <button onclick="toggleLock()" class="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center border border-slate-800">
+        <button onclick="toggleLock()" class="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center border border-slate-800">
             <i class="fa-solid fa-lock text-red-500" id="lock-icon"></i>
         </button>
     </header>
 
-    <div class="bg-white border-b border-slate-200 px-6 py-3 flex justify-between items-center z-[90]">
-        <div class="flex gap-4">
-            <div class="text-center">
-                <p class="text-[8px] font-bold text-slate-400 uppercase">Mesas</p>
-                <p id="stat-occupied" class="text-lg font-black leading-none">0</p>
+    <div class="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center z-50 shadow-sm shrink-0">
+        <div class="flex gap-6">
+            <div class="flex flex-col">
+                <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest">Ocupadas</span>
+                <span id="stat-occupied" class="text-xl font-black">0</span>
             </div>
-            <div class="text-center border-l pl-4">
-                <p class="text-[8px] font-bold text-slate-400 uppercase">Ratio</p>
-                <p id="stat-percent" class="text-lg font-black text-emerald-600 leading-none">0%</p>
+            <div class="flex flex-col border-l pl-6">
+                <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest">Ratio</span>
+                <span id="stat-percent" class="text-xl font-black text-emerald-600">0%</span>
             </div>
         </div>
-        <p id="current-time" class="text-[10px] font-mono font-bold">00:00:00</p>
+        <p id="current-time" class="text-[10px] font-black uppercase text-slate-950">00:00:00</p>
     </div>
 
-    <nav class="px-4 py-2 bg-slate-50 border-b border-slate-200 z-[90]">
-        <div class="flex bg-slate-200/50 p-1 rounded-xl">
-            <button onclick="setMode('audit')" id="nav-audit" class="flex-1 py-2 rounded-lg font-black text-[10px] uppercase bg-white shadow-sm">Auditar</button>
-            <button onclick="setMode('design')" id="nav-design" class="flex-1 py-2 rounded-lg font-black text-[10px] uppercase text-slate-400">Diseño</button>
-            <button onclick="setMode('history')" id="nav-history" class="flex-1 py-2 rounded-lg font-black text-[10px] uppercase text-slate-400">Reportes</button>
+    <nav class="px-4 py-3 bg-slate-50 flex gap-2 border-b border-slate-200 shrink-0">
+        <div class="flex w-full bg-slate-200/50 p-1 rounded-2xl">
+            <button onclick="setMode('audit')" id="nav-audit" class="flex-1 py-3 rounded-xl font-black text-[10px] uppercase bg-white shadow-sm">Auditar</button>
+            <button onclick="setMode('design')" id="nav-design" class="flex-1 py-3 rounded-xl font-black text-[10px] uppercase text-slate-400">Diseño</button>
+            <button onclick="setMode('history')" id="nav-history" class="flex-1 py-3 rounded-xl font-black text-[10px] uppercase text-slate-400">Historial</button>
         </div>
     </nav>
 
-    <main id="main-scroll">
+    <main class="flex-1 overflow-hidden relative" id="main-scroll">
         <div id="map-container">
             <div id="mesas-layer" class="w-full h-full relative"></div>
         </div>
     </main>
 
-    <div id="history-screen" class="screen-overlay">
-        <h2 class="text-xl font-black mb-4 uppercase italic">Historial de Auditorías</h2>
-        <div id="history-list" class="space-y-3 font-mono text-[11px]"></div>
+    <div id="history-screen" class="screen-overlay flex-col p-6">
+        <div id="history-list" class="space-y-4"></div>
     </div>
 
-    <footer class="bg-white border-t border-slate-200 p-4 flex gap-3 z-[100] shrink-0">
-        <button onclick="clearCurrentAudit()" class="w-12 h-12 bg-slate-100 text-slate-400 rounded-xl flex items-center justify-center">
+    <footer class="fixed bottom-0 left-0 right-0 p-6 bg-white/80 backdrop-blur-xl border-t border-slate-100 flex gap-3 z-[100]">
+        <button onclick="clearCurrentAudit()" class="w-14 h-14 bg-slate-100 text-slate-400 rounded-2xl flex items-center justify-center active:scale-90 transition-transform">
             <i class="fa-solid fa-rotate-left"></i>
         </button>
         
         <input type="file" id="ocr-camera-input" accept="image/*" capture="environment" class="hidden" onchange="processImageOCR(event)">
         
-        <button onclick="document.getElementById('ocr-camera-input').click()" class="flex-1 bg-slate-950 text-emerald-400 h-12 rounded-2xl font-black uppercase flex items-center justify-center gap-2 shadow-lg">
-            <i id="ocr-icon" class="fa-solid fa-camera"></i> <span id="ocr-text">SCAN POS</span>
+        <button onclick="document.getElementById('ocr-camera-input').click()" class="flex-1 bg-slate-950 text-emerald-400 h-14 rounded-3xl font-black uppercase flex items-center justify-center gap-2 shadow-2xl active:scale-95 transition-all">
+            <i id="ocr-icon" class="fa-solid fa-camera text-xs"></i> <span id="ocr-text">SCAN POS</span>
         </button>
         
-        <button onclick="saveAudit()" class="flex-1 bg-emerald-500 text-slate-950 h-12 rounded-2xl font-black uppercase shadow-lg">
+        <button onclick="saveAudit()" class="flex-1 bg-emerald-500 text-slate-950 h-14 rounded-3xl font-black uppercase shadow-xl active:scale-95 transition-all">
             Guardar
         </button>
     </footer>
 
-    <div id="toast" class="bg-slate-900 text-white px-6 py-3 rounded-2xl font-bold text-[10px] shadow-2xl flex items-center gap-3">
+    <div id="toast" class="bg-slate-950 text-white px-8 py-4 rounded-3xl font-bold text-xs shadow-2xl flex items-center gap-3">
         <div class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
         <span id="toast-msg">Mensaje</span>
     </div>
 
     <script>
-        const DB_PREFIX = 'spotcheck_final';
+        const DB_PREFIX = 'spotcheck_v3';
         let tables = JSON.parse(localStorage.getItem(`${DB_PREFIX}_tables`)) || [];
         let audits = JSON.parse(localStorage.getItem(`${DB_PREFIX}_audits`)) || [];
         let isLocked = true;
@@ -162,13 +156,11 @@
             render();
             updateTime();
             setInterval(updateTime, 1000);
-            const scroll = document.getElementById('main-scroll');
-            scroll.scrollLeft = 850; scroll.scrollTop = 400;
+            const container = document.getElementById('main-scroll');
+            container.scrollLeft = 850; container.scrollTop = 400;
         }
 
-        function updateTime() {
-            document.getElementById('current-time').innerText = new Date().toLocaleTimeString();
-        }
+        function updateTime() { document.getElementById('current-time').innerText = new Date().toTimeString().split(' ')[0]; }
 
         function render() {
             const layer = document.getElementById('mesas-layer');
@@ -194,7 +186,7 @@
 
             const icon = document.getElementById('ocr-icon');
             const textSpan = document.getElementById('ocr-text');
-            icon.className = "fa-solid fa-spinner animate-spin";
+            icon.className = "fa-solid fa-circle-notch animate-spin text-emerald-400";
             textSpan.innerText = "LEYENDO...";
 
             const reader = new FileReader();
@@ -202,10 +194,10 @@
                 const img = new Image();
                 img.onload = () => {
                     Tesseract.recognize(img, 'eng').then(({ data: { text } }) => {
-                        // 1. Resetear mesas antes de pintar nuevas
+                        // Resetear mapa antes de procesar
                         tables.forEach(t => t.status = 'free');
 
-                        // 2. Extraer números de formato "Mesa/1"
+                        // Capturar números antes del "/ 1" (Formato POS)
                         const matches = text.match(/(\d+)\s*\/\s*1/g) || [];
                         const detected = matches.map(m => m.split('/')[0].trim());
 
@@ -220,7 +212,7 @@
                         showToast(matched > 0 ? `Sincronizadas ${matched} mesas` : "No se detectaron mesas");
                         render(); saveData();
                     }).finally(() => {
-                        icon.className = "fa-solid fa-camera";
+                        icon.className = "fa-solid fa-camera text-xs";
                         textSpan.innerText = "SCAN POS";
                         document.getElementById('ocr-camera-input').value = "";
                     });
@@ -232,12 +224,13 @@
 
         function saveAudit() {
             const occupied = tables.filter(t => t.status === 'occupied').map(t => t.label);
-            if(!occupied.length) return showToast("Sin datos para guardar");
+            if(!occupied.length) return showToast("No hay mesas marcadas");
             
+            const now = new Date();
             const report = {
                 id: Date.now(),
-                date: new Date().toLocaleDateString(),
-                time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+                date: now.toLocaleDateString(),
+                time: now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
                 count: occupied.length,
                 details: occupied.join(', ')
             };
@@ -251,21 +244,21 @@
         function renderHistory() {
             const list = document.getElementById('history-list');
             list.innerHTML = audits.map(a => `
-                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm uppercase">
-                    <p class="font-black text-slate-400 mb-2 border-b pb-1">${a.date} - ${a.time}</p>
-                    REPORTE OPEN CHECKS: ${a.count} MESAS<br>
-                    MESAS EN MICROS: ${a.details}<br><br>
+                <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm font-mono text-[11px] uppercase leading-tight">
+                    REPORTE (Open Checks): ${a.date} ${a.time}<br>
+                    MESAS REGISTRADAS: ${a.count}<br>
+                    DETALLE POS: ${a.details}<br><br>
                     FIRMA: ____________________
                 </div>
-            `).join('') || '<p class="text-center py-10 opacity-30">SIN HISTORIAL</p>';
+            `).join('') || '<p class="text-center py-10 opacity-40 uppercase font-black">Sin Historial</p>';
         }
 
         function setMode(m) {
             currentMode = m;
-            document.getElementById('nav-audit').className = m === 'audit' ? "flex-1 py-2 rounded-lg font-black text-[10px] uppercase bg-white shadow-sm" : "flex-1 py-2 rounded-lg font-black text-[10px] uppercase text-slate-400";
-            document.getElementById('nav-design').className = m === 'design' ? "flex-1 py-2 rounded-lg font-black text-[10px] uppercase bg-white shadow-sm" : "flex-1 py-2 rounded-lg font-black text-[10px] uppercase text-slate-400";
-            document.getElementById('nav-history').className = m === 'history' ? "flex-1 py-2 rounded-lg font-black text-[10px] uppercase bg-white shadow-sm" : "flex-1 py-2 rounded-lg font-black text-[10px] uppercase text-slate-400";
-            
+            ['audit', 'design', 'history'].forEach(id => {
+                document.getElementById('nav-'+id).className = m === id ? "flex-1 py-3 rounded-xl font-black text-[10px] uppercase bg-white shadow-sm text-slate-950" : "flex-1 py-3 rounded-xl font-black text-[10px] uppercase text-slate-400";
+            });
+            document.getElementById('map-container').className = m === 'design' ? "design-grid" : "";
             document.getElementById('history-screen').classList.toggle('active', m === 'history');
             if(m === 'history') renderHistory();
             render();
@@ -274,7 +267,7 @@
         function toggleLock() {
             isLocked = !isLocked;
             document.getElementById('lock-icon').className = isLocked ? "fa-solid fa-lock text-red-500" : "fa-solid fa-lock-open text-emerald-500";
-            showToast(isLocked ? "Mapa Bloqueado" : "Edición Libre");
+            showToast(isLocked ? "Mapa Bloqueado" : "Modo Edición");
         }
 
         function showToast(msg) {
@@ -289,7 +282,7 @@
             localStorage.setItem(`${DB_PREFIX}_audits`, JSON.stringify(audits));
         }
 
-        function clearCurrentAudit() { if(confirm("¿Limpiar mesas?")) { tables.forEach(t => t.status = 'free'); render(); saveData(); } }
+        function clearCurrentAudit() { if(confirm("¿Limpiar mesas actuales?")) { tables.forEach(t => t.status = 'free'); render(); saveData(); } }
 
         init();
     </script>
