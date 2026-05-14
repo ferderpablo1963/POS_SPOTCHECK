@@ -100,7 +100,7 @@
         
         .selected-design .handle { display: flex; }
         .resizer-handle { right: -19px; bottom: -19px; background-color: #f59e0b; cursor: nwse-resize; }
-        .rotator-handle { right: -19px; top: -19px; background-color: #3b82f6; cursor: crosshair; }
+        .rotator-handle { right: -19px; top: top-19px; background-color: #3b82f6; cursor: crosshair; }
 
         #toast {
             position: fixed;
@@ -189,7 +189,7 @@
             </div>
         </div>
         <div class="text-right flex items-center gap-2">
-            <input type="file" id="ocr-camera-input" accept="image/*" capture="environment" class="hidden" onchange="processImageOCR(event)">
+            <input type="file" id="ocr-camera-input" accept="image/*" class="hidden" onchange="processImageOCR(event)">
             <button onclick="toggleFit()" id="btn-fit" class="bg-slate-100 px-4 py-2 rounded-lg text-[10px] font-black uppercase text-slate-600 active:bg-slate-300 transition-colors">
                 <i class="fa-solid fa-expand mr-1"></i> FIT
             </button>
@@ -793,7 +793,7 @@ Generado por el Sistema de Control SPOT CHECK
             const t = document.getElementById('toast');
             document.getElementById('toast-msg').innerText = msg;
             t.classList.add('show');
-            toastTimeout = setTimeout(() => t.classList.remove('show'), 2000);
+            toastTimeout = setTimeout(() => t.classList.remove('show'), 2500);
         }
 
         function resetLayout() { if (confirm("¿Limpiar todo el diseño actual?")) { createInitialLayout(); render(); } }
@@ -808,81 +808,86 @@ Generado por el Sistema de Control SPOT CHECK
             document.getElementById('ocr-camera-input').click();
         }
 
-        /* FUNCIÓN OCR DIRECTA - COMPLEMENTADA Y SIN ERRORES DE BLOQUEO */
-        function processImageOCR(event) {
+        /* MOTOR DE DETECCIÓN ASÍNCRONO OPTIMIZADO CONTRA ERRORES */
+        async function processImageOCR(event) {
             const file = event.target.files[0];
             if (!file) return;
 
             const ocrIcon = document.getElementById('btn-ocr-icon');
             const ocrText = document.getElementById('btn-ocr-text');
 
-            // Feedback visual inmediato
+            // 1. Estado de carga inmediato
             ocrIcon.className = "fa-solid fa-spinner animate-spin text-amber-400 text-sm";
             ocrText.innerText = "LEYENDO...";
-            showToast("Procesando documento...");
-
-            // Obligar a la pestaña "Auditar" para ver el resultado en vivo
+            showToast("Analizando imagen del POS...");
             setMode('audit');
 
-            // Limpiamos los estados de ocupación previos para pintar únicamente lo que halle el scan
+            // Limpiar estados previos para pintar en limpio
             tables.forEach(t => t.status = 'free');
 
             const reader = new FileReader();
-            reader.onload = function(e) {
-                // Ejecución directa de Tesseract v5 (Usa canvassing interno automático)
-                Tesseract.recognize(
-                    e.target.result,
-                    'eng',
-                    { logger: m => console.log(m) }
-                ).then(({ data: { text } }) => {
-                    console.log("Texto Crudo Extraído del POS:", text);
+            reader.onload = async function(e) {
+                try {
+                    // 2. Ejecutar Tesseract usando un bloque asíncrono puro (Evita congelamientos CORS locales)
+                    const result = await Tesseract.recognize(
+                        e.target.result,
+                        'eng',
+                        { logger: m => console.log("OCR progress:", m.progress) }
+                    );
 
-                    // Normalización del texto para tolerar fallas de impresión (ej. Tbi, Tpi, Tbl, tb1)
-                    let cleanedText = text.toLowerCase()
-                                          .replace(/tb1/g, 'tbl')
-                                          .replace(/tbi/g, 'tbl')
-                                          .replace(/tpi/g, 'tbl')
-                                          .replace(/tp1/g, 'tbl')
-                                          .replace(/7bl/g, 'tbl');
+                    const text = result.data.text || "";
+                    console.log("Texto extraído sin filtrar:", text);
+
+                    // 3. Normalización agresiva inteligente para paliar reflejos de pantalla
+                    let textClean = text.toLowerCase()
+                                        .replace(/\s+/g, ' ')  // Quita espacios múltiples y saltos locos
+                                        .replace(/tb1/g, 'tbl')
+                                        .replace(/tbi/g, 'tbl')
+                                        .replace(/tpi/g, 'tbl')
+                                        .replace(/tp1/g, 'tbl')
+                                        .replace(/7bl/g, 'tbl')
+                                        .replace(/tbi/g, 'tbl');
 
                     const detectedNumbers = [];
-                    // Expresión regular exacta: Busca 'tbl', espacios opcionales, captura dígitos, y verifica que siga una '/'
-                    const regex = /tbl\s*(\d+)\s*\//g;
                     
+                    // Expresión regular flexible: captura dígitos aislados que estén precedidos de variaciones de "tbl"
+                    // ya no exige que la barra "/" esté pegada inmediatamente, permitiendo que capte la mesa limpia.
+                    const regex = /(?:tbl|tb|t)\s*(\d+)/g;
                     let match;
-                    while ((match = regex.exec(cleanedText)) !== null) {
-                        detectedNumbers.push(match[1]); 
+                    while ((match = regex.exec(textClean)) !== null) {
+                        detectedNumbers.push(match[1]);
                     }
 
-                    console.log("Mesas procesadas y encontradas:", detectedNumbers);
+                    console.log("Números detectados finalmente:", detectedNumbers);
 
+                    // 4. Mapear y pintar las mesas encontradas en negro
                     let matchedCount = 0;
                     tables.forEach(t => {
-                        // Compara el número de mesa (label) con los capturados
                         if (detectedNumbers.includes(t.label)) {
-                            t.status = 'occupied'; // Pinta automáticamente de negro
+                            t.status = 'occupied';
                             matchedCount++;
                         }
                     });
 
+                    // 5. Devolución de feedback dinámico
                     if (matchedCount > 0) {
-                        showToast(`Sincronizado: ${matchedCount} mesas encontradas`);
+                        showToast(`¡Éxito! Sincronizadas ${matchedCount} mesas.`);
                     } else {
-                        showToast("No se hallaron patrones 'Tbl [Nro]/'");
+                        showToast("Código leído, pero sin formato 'Tbl [Nro]' coincidente.");
                     }
 
                     saveData();
                     render();
 
-                }).catch(err => {
-                    console.error("Error crítico en el motor de Tesseract:", err);
-                    showToast("Fallo en la lectura del documento");
-                }).finally(() => {
-                    // Restablecer estilos originales de la interfaz
+                } catch (error) {
+                    console.error("Fallo crítico controlado en el OCR:", error);
+                    showToast("Error de lectura: Intente una foto más cercana");
+                } finally {
+                    // 6. Restablecer interfaz ocurra lo que ocurra
                     ocrIcon.className = "fa-solid fa-camera text-sm";
                     ocrText.innerText = "SCAN";
                     document.getElementById('ocr-camera-input').value = "";
-                });
+                }
             };
 
             reader.readAsDataURL(file);
