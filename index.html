@@ -341,34 +341,67 @@
         let startMesaPos = { x: 0, y: 0 };
         let startMesaSize = { w: 0, h: 0 };
 
+
+
+
         /* ==========================================================================
-           ALGORITMO DE EXTRACCIÓN DE MESAS DESDE IMAGEN (POS) - CORREGIDO
-           ========================================================================== */
-        async function processPOSImage(event) {
-            const file = event.target.files[0];
-            if (!file) return;
+           // --- INICIO DE ALGORITMO DE ESCANEO POS ---
+// Importamos la librería dinámicamente para no romper tu estructura
+const scriptOCR = document.createElement('script');
+scriptOCR.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+document.head.appendChild(scriptOCR);
 
-            const loading = document.getElementById('ocr-loading');
-            loading.style.display = 'flex';
+async function processPOSImage(event) {
+    const file = event.target.files[0];
+    if (!file) return;
 
-            try {
-                // 1. Limpiar todas las mesas (poner en blanco) antes de empezar
-                tables.forEach(t => t.status = 'free');
-                
-                const { data: { text } } = await Tesseract.recognize(file, 'eng');
-                console.log("Texto detectado:", text); // Para depuración en consola
+    showToast("Escaneando sistema...");
 
-                // 2. Regex ajustada: busca "Tbl", espacio(s), captura el número, y busca la "/"
-                // La "i" es para ignorar mayúsculas/minúsculas
-                const tableRegex = /Tbl\s+(\d+)\//gi;
-                let match;
-                const foundTables = [];
+    try {
+        // 1. LIMPIEZA PREVIA: Poner todas las mesas en blanco (free)
+        tables.forEach(t => t.status = 'free');
+        
+        // 2. PROCESAMIENTO OCR
+        const { data: { text } } = await Tesseract.recognize(file, 'eng');
+        console.log("Texto detectado:", text);
 
-                while ((match = tableRegex.exec(text)) !== null) {
-                    foundTables.push(match[1]); 
-                }
+        // 3. REGEX: Busca "Tbl", espacio(s), captura número hasta la "/"
+        const tableRegex = /Tbl\s+(\d+)\//gi;
+        let match;
+        let foundCount = 0;
 
-                if (foundTables.length > 0) {
+        while ((match = tableRegex.exec(text)) !== null) {
+            const tableNumber = match[1]; // Este es el número capturado
+            const mesa = tables.find(t => t.label === tableNumber);
+            
+            if (mesa) {
+                mesa.status = 'occupied'; // Pintar de negro
+                foundCount++;
+            }
+        }
+
+        // 4. ACTUALIZAR INTERFAZ SIN CAMBIAR ESTRUCTURA
+        saveData();
+        render();
+        
+        if (foundCount > 0) {
+            showToast(`Se marcaron ${foundCount} mesas`);
+        } else {
+            showToast("No se detectaron mesas con formato Tbl #/");
+        }
+
+    } catch (error) {
+        console.error("Error en OCR:", error);
+        showToast("Error al procesar la imagen");
+    } finally {
+        event.target.value = ''; // Reset del input
+    }
+}
+// --- FIN DE ALGORITMO DE ESCANEO POS ---
+
+              
+
+  if (foundTables.length > 0) {
                     // 3. Pintar de negro solo las detectadas
                     foundTables.forEach(label => {
                         const mesa = tables.find(t => t.label === label);
