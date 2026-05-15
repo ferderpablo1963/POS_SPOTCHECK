@@ -2,372 +2,505 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#020617">
     
-    <title>SPOT CHECK - 1225 LOBBY</title>
+    <title>SPOT CHECK - CONTROL PROFESIONAL</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     
     <style>
-        body { font-family: system-ui, sans-serif; overscroll-behavior: none; background-color: #f8fafc; }
-        #main-scroll { overflow: auto; position: relative; background-color: #e2e8f0; }
+        body { 
+            font-family: system-ui, -apple-system, sans-serif; 
+            overscroll-behavior: none; 
+            -webkit-tap-highlight-color: transparent; 
+            background-color: #f8fafc;
+        }
+        
+        #viewport {
+            overflow: hidden;
+            touch-action: none;
+            position: relative;
+            background-color: #e2e8f0;
+            flex: 1;
+        }
+
         #map-container { 
-            height: 1000px; width: 1400px; 
-            position: relative; background-color: #ffffff;
-            transition: transform 0.3s ease; transform-origin: top left;
+            height: 1500px; 
+            width: 2000px;
+            position: absolute;
+            background-color: #ffffff;
+            transform-origin: 0 0;
+            box-shadow: 0 0 50px rgba(0,0,0,0.1);
         }
+
+        .design-grid {
+            background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+            background-size: 30px 30px;
+        }
+
         .mesa {
-            position: absolute; border-radius: 10px; display: flex;
-            align-items: center; justify-content: center; font-weight: 800;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1); cursor: pointer;
-            z-index: 10; transform: translate(-50%, -50%);
+            position: absolute;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            font-size: 14px;
+            border: 2px solid #cbd5e1;
+            transition: transform 0.1s, box-shadow 0.1s, background-color 0.2s;
+            cursor: pointer;
+            user-select: none;
+            touch-action: none;
+            z-index: 10;
         }
-        .mesa-free { background-color: #ffffff; color: #64748b; border: 2px solid #e2e8f0; }
-        .mesa-occupied { background-color: #000000 !important; color: #ffffff !important; border: 2px solid #000000; }
-        .mesa-indet { background-color: #ef4444 !important; color: #ffffff !important; border: 2px solid #ef4444; }
-        
+
+        .mesa.dragging {
+            opacity: 0.8;
+            box-shadow: 0 15px 30px rgba(0,0,0,0.3);
+            z-index: 1000;
+            border-color: #f59e0b !important;
+            transform: scale(1.1);
+        }
+
+        .mesa.circulo { border-radius: 50%; }
+        .mesa.cuadrado { border-radius: 12px; }
+
+        .status-free { background-color: #ffffff; color: #1e293b; border-color: #e2e8f0; }
+        .status-occupied { background-color: #000000; color: #ffffff; border-color: #000000; }
+        .status-undefined { background-color: #ef4444; color: #ffffff; border-color: #b91c1c; }
+
         .screen-overlay {
-            position: fixed; left: 0; right: 0; bottom: 0; top: 205px;    
-            background-color: #f8fafc; z-index: 100; overflow-y: auto; display: none;
+            position: fixed;
+            inset: 0;
+            top: 130px; 
+            background-color: #f8fafc;
+            z-index: 200;   
+            display: none;
+            flex-direction: column;
+            padding: 20px;
+            overflow-y: auto;
         }
-        .screen-overlay.active { display: flex; flex-direction: column; }
-        
-        #toast {
-            position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%) translateY(100px);
-            transition: transform 0.3s; z-index: 1000;
+        .screen-overlay.active { display: flex; }
+
+        .tab-btn {
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+            opacity: 0.5;
         }
-        #toast.show { transform: translateX(-50%) translateY(0); }
+        .tab-btn.active {
+            border-bottom-color: #ef4444;
+            color: #ef4444;
+            opacity: 1;
+        }
+
+        .zoom-ctrl {
+            position: fixed;
+            right: 20px;
+            bottom: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            z-index: 100;
+        }
+
+        .btn-round {
+            width: 55px;
+            height: 55px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+            color: #1e293b;
+            border: 1px solid #f1f5f9;
+        }
+
+        #design-toolbar {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #0f172a;
+            padding: 12px 24px;
+            border-radius: 24px;
+            display: none;
+            gap: 15px;
+            align-items: center;
+            z-index: 300;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+        }
     </style>
 </head>
-<body class="h-screen flex flex-col overflow-hidden select-none text-slate-900">
+<body class="h-screen flex flex-col overflow-hidden">
 
-    <header class="bg-slate-950 text-white p-5 pt-12 flex justify-between items-center shrink-0 z-[110]">
-        <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center">
-                <i class="fa-solid fa-layer-group text-slate-950 text-xl"></i>
+    <!-- HEADER -->
+    <header class="bg-slate-950 text-white p-4 pt-6 shrink-0 z-[400]">
+        <div class="flex justify-between items-center mb-4">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center italic font-black text-xs">SC</div>
+                <h1 class="font-black text-lg tracking-tighter uppercase italic leading-none">SPOT CHECK</h1>
             </div>
-            <div>
-                <h1 class="font-black text-xl italic uppercase">SPOT CHECK</h1>
-                <p class="text-[8px] text-slate-400 font-black tracking-widest uppercase">1225 LOBBY BAR</p>
-            </div>
+            <button onclick="openModal('save-modal')" class="bg-red-600 px-5 py-2 rounded-full text-[10px] font-black uppercase italic tracking-widest">Finalizar</button>
         </div>
-        <button onclick="toggleLock()" id="lock-btn" class="flex items-center gap-2 px-4 py-2 bg-slate-900 rounded-2xl border border-slate-800">
-            <span id="lock-text" class="text-[9px] font-black uppercase text-slate-500">BLOQUEADO</span>
-            <i class="fa-solid fa-lock text-red-500" id="lock-icon"></i>
-        </button>
+        
+        <div class="flex gap-6 overflow-x-auto no-scrollbar border-t border-white/10 pt-2">
+            <button onclick="switchTab('map')" id="btn-map" class="tab-btn active px-1 py-2 font-black text-[10px] uppercase italic whitespace-nowrap">MAPA</button>
+            <button onclick="switchTab('notes')" id="btn-notes" class="tab-btn text-slate-500 px-1 py-2 font-black text-[10px] uppercase italic whitespace-nowrap">NOTAS</button>
+            <button onclick="switchTab('report')" id="btn-report" class="tab-btn text-slate-500 px-1 py-2 font-black text-[10px] uppercase italic whitespace-nowrap">REPORTES</button>
+            <button onclick="switchTab('design')" id="btn-design" class="tab-btn text-amber-500 px-1 py-2 font-black text-[10px] uppercase italic whitespace-nowrap">CONSTRUCTOR</button>
+        </div>
     </header>
 
-    <div class="bg-white border-b border-slate-200 px-6 py-3 flex justify-between items-center z-50 shrink-0">
+    <!-- ESTADÍSTICAS -->
+    <div class="bg-white border-b border-slate-200 px-4 py-2 flex justify-between items-center z-10 shrink-0">
         <div class="flex gap-4">
-            <div><p class="text-[8px] font-black text-slate-400 uppercase">Físico</p><p id="stat-occupied" class="text-sm font-black">0</p></div>
-            <div><p class="text-[8px] font-black text-slate-400 uppercase">Ocupación</p><p id="stat-percent" class="text-sm font-black text-emerald-600">0%</p></div>
+            <div class="flex items-center gap-1"><div class="w-2 h-2 bg-slate-200 rounded-full border border-slate-300"></div><span id="c-free" class="text-[10px] font-black italic">0</span></div>
+            <div class="flex items-center gap-1"><div class="w-2 h-2 bg-black rounded-full"></div><span id="c-occ" class="text-[10px] font-black italic">0</span></div>
+            <div class="flex items-center gap-1"><div class="w-2 h-2 bg-red-500 rounded-full"></div><span id="c-und" class="text-[10px] font-black italic text-red-600">0</span></div>
         </div>
-        <div class="flex items-center gap-3">
-            <label class="bg-emerald-500 text-slate-950 px-3 py-2 rounded-lg text-[10px] font-black uppercase cursor-pointer flex items-center gap-2">
-                <i id="ocr-icon" class="fa-solid fa-camera"></i> <span id="ocr-text">SCAN</span>
-                <input type="file" accept="image/*" capture="environment" class="hidden" onchange="handleOCR(this)">
-            </label>
-            <button onclick="toggleFit()" id="btn-fit" class="bg-slate-100 px-3 py-2 rounded-lg text-[10px] font-black uppercase text-slate-600">FIT</button>
-        </div>
+        <div id="mode-indicator" class="text-[8px] font-black uppercase text-slate-400 bg-slate-100 px-2 py-1 rounded tracking-widest transition-all">MODO LECTURA</div>
     </div>
 
-    <nav class="px-4 py-2 bg-slate-50 flex gap-1 z-40 border-b border-slate-200">
-        <button onclick="setMode('audit')" id="nav-audit" class="flex-1 py-2 rounded-xl font-black text-[10px] uppercase bg-white shadow-sm border-b-2 border-emerald-500">Auditar</button>
-        <button onclick="setMode('notes')" id="nav-notes" class="flex-1 py-2 rounded-xl font-black text-[10px] uppercase text-slate-400">Reporte</button>
-        <button onclick="setMode('history')" id="nav-history" class="flex-1 py-2 rounded-xl font-black text-[10px] uppercase text-slate-400">Historial</button>
-    </nav>
-
-    <main class="flex-1 overflow-hidden" id="main-scroll">
+    <!-- ÁREA DEL MAPA -->
+    <main id="viewport">
         <div id="map-container">
-            <div id="mesas-layer" class="w-full h-full"></div>
+            <!-- Referencia estática de barra -->
+            <div class="absolute bg-slate-100 border-2 border-dashed border-slate-300 flex items-center justify-center font-black text-slate-300 italic text-2xl uppercase" style="left: 600px; top: 40px; width: 600px; height: 100px; border-radius: 50px;">Barra Principal</div>
+            <div id="mesas-layer" class="w-full h-full relative"></div>
+        </div>
+        
+        <div class="zoom-ctrl">
+            <button onclick="changeZoom(0.1)" class="btn-round"><i class="fa-solid fa-plus text-sm"></i></button>
+            <button onclick="changeZoom(-0.1)" class="btn-round"><i class="fa-solid fa-minus text-sm"></i></button>
+            <button onclick="resetZoom()" class="btn-round"><i class="fa-solid fa-expand text-sm"></i></button>
+        </div>
+
+        <!-- Toolbar de Diseño Flotante -->
+        <div id="design-toolbar">
+            <span class="text-[9px] text-amber-500 font-black uppercase italic mr-2">Diseño:</span>
+            <button onclick="addNewMesa()" class="bg-white/10 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase italic border border-white/20 hover:bg-white/20">
+                <i class="fa-solid fa-plus mr-1"></i> Nueva Mesa
+            </button>
+            <button onclick="resetLayout()" class="text-white/40 px-2 py-2 font-black text-[9px] uppercase italic">Reiniciar</button>
         </div>
     </main>
 
-    <div id="notes-screen" class="screen-overlay p-4">
-        <div class="bg-white p-6 rounded-[2rem] shadow-xl border border-slate-200 max-w-md mx-auto w-full space-y-4">
-            <div class="text-center border-b border-slate-100 pb-3">
-                <h3 class="text-[10px] font-black uppercase italic">PREPARACIÓN DE REPORTE</h3>
-            </div>
-            <div class="grid grid-cols-2 gap-3">
+    <!-- PANTALLAS DE OVERLAY -->
+    <div id="notes-screen" class="screen-overlay">
+        <h2 class="font-black text-xl italic uppercase mb-4 text-slate-800">Observaciones</h2>
+        <textarea id="main-notes" placeholder="Escriba aquí notas generales de la auditoría..." class="w-full h-80 p-5 bg-white rounded-[2rem] border-2 border-slate-200 font-bold text-slate-600 uppercase text-xs shadow-inner"></textarea>
+    </div>
+
+    <div id="report-screen" class="screen-overlay">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="font-black text-xl italic uppercase text-slate-800">Historial</h2>
+            <button onclick="clearHistory()" class="text-red-500 text-[10px] font-black uppercase italic border border-red-200 px-4 py-1 rounded-full">Limpiar Todo</button>
+        </div>
+        <div id="history-list" class="space-y-4 pb-20"></div>
+    </div>
+
+    <!-- MODAL EDICIÓN DE MESA (Para modo diseño) -->
+    <div id="edit-mesa-modal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md hidden z-[600] items-center justify-center p-6">
+        <div class="bg-white w-full max-w-sm rounded-[3rem] p-8">
+            <h3 class="font-black uppercase italic text-lg mb-6 text-center text-slate-900 underline decoration-red-500 decoration-4">Propiedades</h3>
+            <div class="space-y-4 mb-8">
                 <div>
-                    <label class="text-[8px] font-black uppercase text-slate-400 ml-1">Mesa In Situ</label>
-                    <input id="note-insitu" type="number" readonly class="w-full p-3 bg-slate-100 rounded-xl font-black text-center text-sm">
+                    <label class="text-[9px] font-black uppercase ml-2 text-slate-400">Etiqueta</label>
+                    <input id="edit-label" type="text" class="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-black uppercase text-xs">
                 </div>
-                <div>
-                    <label class="text-[8px] font-black uppercase text-slate-400 ml-1">Sistema POS</label>
-                    <input id="note-micros" type="number" placeholder="Cant." class="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl font-black text-center text-sm">
+                <div class="grid grid-cols-2 gap-3">
+                    <button onclick="setMesaProp('type', 'cuadrado')" class="p-4 bg-slate-100 rounded-2xl font-black text-[10px] uppercase italic border-2 border-transparent focus:border-slate-900">Cuadrada</button>
+                    <button onclick="setMesaProp('type', 'circulo')" class="p-4 bg-slate-100 rounded-2xl font-black text-[10px] uppercase italic border-2 border-transparent focus:border-slate-900">Redonda</button>
                 </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-[9px] font-black uppercase ml-2 text-slate-400">Ancho</label>
+                        <input id="edit-w" type="number" class="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-black text-xs text-center">
+                    </div>
+                    <div>
+                        <label class="text-[9px] font-black uppercase ml-2 text-slate-400">Alto</label>
+                        <input id="edit-h" type="number" class="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-black text-xs text-center">
+                    </div>
+                </div>
+                <button onclick="deleteMesa()" class="w-full py-3 text-red-500 font-black uppercase italic text-[10px] bg-red-50 rounded-2xl border border-red-100">Eliminar Mesa</button>
             </div>
-            <input id="note-lugar" type="text" placeholder="Ubicación / Sector" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xs">
-            <div class="grid grid-cols-2 gap-3">
-                <input id="note-hora" type="text" class="w-full p-3 bg-slate-100 rounded-xl font-bold text-xs text-center" readonly>
-                <input id="note-firma" type="text" placeholder="Firma / Auditor" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-black text-xs text-center">
-            </div>
-            <textarea id="note-observaciones" rows="3" placeholder="Observaciones..." class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs"></textarea>
-            <button onclick="saveAudit()" class="w-full bg-slate-950 text-white py-4 rounded-2xl font-black text-xs uppercase shadow-xl">Guardar e Historial</button>
+            <button onclick="saveMesaEdit()" class="w-full py-5 bg-slate-950 text-white rounded-2xl font-black uppercase italic shadow-xl mb-4">Guardar y Cerrar</button>
+            <button onclick="closeModal('edit-mesa-modal')" class="w-full text-slate-400 font-black text-[10px] uppercase italic">Cancelar</button>
         </div>
     </div>
 
-    <div id="history-screen" class="screen-overlay p-6">
-        <h2 class="font-black uppercase italic mb-4">Historial de Controles</h2>
-        <div id="history-list" class="space-y-4"></div>
-        <button onclick="clearHistory()" class="mt-8 w-full py-3 text-red-500 font-black text-[10px] uppercase">Borrar Todo</button>
-    </div>
-
-    <footer id="main-footer" class="p-4 bg-white border-t border-slate-200 shrink-0 z-50">
-        <div class="flex gap-2">
-            <button onclick="setMode('notes')" class="flex-1 bg-slate-950 text-white py-4 rounded-2xl font-black text-xs uppercase shadow-xl">Generar Reporte</button>
-            <button onclick="clearCurrent()" class="px-6 bg-slate-100 text-slate-400 rounded-2xl"><i class="fa-solid fa-rotate-right"></i></button>
+    <!-- MODAL FINALIZAR AUDITORÍA -->
+    <div id="save-modal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md hidden z-[500] items-center justify-center p-6">
+        <div class="bg-white w-full max-w-sm rounded-[3rem] p-8 shadow-2xl">
+            <h3 class="text-center font-black uppercase italic text-xl mb-8">Resumen Final</h3>
+            <div class="space-y-5 mb-8">
+                <input id="f-auditor" type="text" placeholder="NOMBRE DEL AUDITOR" class="w-full p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl font-black uppercase text-xs">
+                <input id="f-lugar" type="text" placeholder="SECTOR (EJ. BARRA, TERRAZA)" class="w-full p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl font-black uppercase text-xs">
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-black uppercase ml-2 text-slate-400">In Situ</label>
+                        <input id="f-fisico" type="number" placeholder="0" class="w-full p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl font-black text-sm text-center">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-black uppercase ml-2 text-slate-400">Micros</label>
+                        <input id="f-sistema" type="number" placeholder="0" class="w-full p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl font-black text-sm text-center">
+                    </div>
+                </div>
+            </div>
+            <button onclick="confirmSave()" class="w-full py-6 bg-red-600 text-white rounded-2xl font-black uppercase italic shadow-2xl shadow-red-900/40 mb-4">Guardar Reporte</button>
+            <button onclick="closeModal('save-modal')" class="w-full text-slate-400 font-black text-[10px] uppercase italic">Regresar al Mapa</button>
         </div>
-    </footer>
-
-    <div id="toast" class="bg-slate-900 text-white px-6 py-3 rounded-full font-bold text-[10px] uppercase shadow-2xl">
-        <span id="toast-msg"></span>
     </div>
 
     <script>
-        const DB_PREFIX = 'spotcheck_1225_final';
+        const DB_PREFIX = 'SPOTCHECK_PROF_V6';
         let tables = [];
         let audits = JSON.parse(localStorage.getItem(`${DB_PREFIX}_audits`)) || [];
-        let isLocked = true;
-        let currentMode = 'audit', isFitted = false, draggingId = null;
+        let isDesignMode = false;
+        let scale = 0.5, tx = 20, ty = 20;
+        let selectedMesaId = null;
+
+        const viewport = document.getElementById('viewport');
+        const mapContainer = document.getElementById('map-container');
+        const mesasLayer = document.getElementById('mesas-layer');
 
         function createInitialLayout() {
-            const mapData = [
-                {l:"1", x:750, y:80}, {l:"2", x:830, y:80}, {l:"3", x:910, y:80},
-                {l:"4", x:680, y:180}, {l:"5", x:750, y:180}, {l:"6", x:820, y:180}, {l:"7", x:890, y:180},
-                {l:"8", x:1050, y:280}, {l:"9", x:1120, y:280},
-                {l:"33", x:250, y:320}, {l:"30", x:400, y:360},
-                {l:"34", x:250, y:480}, {l:"31", x:400, y:480},
-                {l:"20", x:650, y:520}, {l:"21", x:720, y:520},
-                {l:"23", x:650, y:650}, {l:"22", x:720, y:650},
-                {l:"10", x:1050, y:550}, {l:"11", x:1050, y:680},
-                {l:"24", x:550, y:750}, {l:"32", x:350, y:800}, {l:"25", x:750, y:820}
-            ];
-            tables = mapData.map((m, i) => ({
-                id: i, x: m.x, y: m.y, label: m.l, status: 'free', w: 60, h: 60
-            }));
+            const layout = [];
+            // Filas de mesas estandar
+            for(let i=0; i<10; i++) {
+                layout.push({ id: Date.now()+i, label: `${i+1}`, x: 300 + (i*80), y: 250, w: 60, h: 60, type: 'cuadrado', status: 'free' });
+                layout.push({ id: Date.now()+20+i, label: `${i+11}`, x: 300 + (i*80), y: 400, w: 60, h: 60, type: 'cuadrado', status: 'free' });
+            }
+            // VIPs circulares
+            for(let i=0; i<5; i++) {
+                layout.push({ id: Date.now()+50+i, label: `V${i+1}`, x: 100, y: 150 + (i*120), w: 90, h: 90, type: 'circulo', status: 'free' });
+            }
+            tables = layout;
             saveData();
         }
 
         function init() {
             const saved = localStorage.getItem(`${DB_PREFIX}_tables`);
-            if (!saved) createInitialLayout(); else tables = JSON.parse(saved);
+            if(saved) tables = JSON.parse(saved); else createInitialLayout();
             render();
-            
-            window.addEventListener('pointermove', (e) => {
-                if (draggingId !== null && !isLocked) {
-                    const t = tables.find(x => x.id === draggingId);
-                    const rect = document.getElementById('map-container').getBoundingClientRect();
-                    let scale = isFitted ? parseFloat(document.getElementById('map-container').style.transform.split('(')[1]) : 1;
-                    t.x = (e.clientX - rect.left) / scale;
-                    t.y = (e.clientY - rect.top) / scale;
-                    render();
-                }
-            });
-            window.addEventListener('pointerup', () => { if(draggingId !== null) { draggingId = null; saveData(); } });
+            setupPanning();
+            applyTransform();
+        }
+
+        function setupPanning() {
+            let isPanning = false, startX, startY;
+            viewport.onpointerdown = e => {
+                if (e.target.closest('.mesa')) return;
+                isPanning = true;
+                startX = e.clientX - tx;
+                startY = e.clientY - ty;
+                viewport.setPointerCapture(e.pointerId);
+            };
+            viewport.onpointermove = e => {
+                if (!isPanning) return;
+                tx = e.clientX - startX;
+                ty = e.clientY - startY;
+                applyTransform();
+            };
+            viewport.onpointerup = () => { isPanning = false; };
         }
 
         function render() {
-            const layer = document.getElementById('mesas-layer');
-            layer.innerHTML = '';
-            let count = 0;
+            mesasLayer.innerHTML = '';
+            let counts = { free: 0, occ: 0, und: 0 };
+            
             tables.forEach(t => {
-                if(t.status !== 'free') count++;
-                const div = document.createElement('div');
-                div.className = `mesa ${t.status === 'occupied' ? 'mesa-occupied' : (t.status === 'indet' ? 'mesa-indet' : 'mesa-free')}`;
-                div.style.cssText = `left:${t.x}px; top:${t.y}px; width:${t.w}px; height:${t.h}px;`;
-                div.innerHTML = `<span>${t.label}</span>`;
-                div.onpointerdown = (e) => {
-                    if (!isLocked) { draggingId = t.id; }
-                    else if (currentMode === 'audit') {
-                        t.status = t.status === 'free' ? 'occupied' : (t.status === 'occupied' ? 'indet' : 'free');
-                        saveData(); render();
+                counts[t.status === 'free' ? 'free' : (t.status === 'occupied' ? 'occ' : 'und')]++;
+                
+                const el = document.createElement('div');
+                el.className = `mesa ${t.type} status-${t.status}`;
+                el.style.left = `${t.x}px`;
+                el.style.top = `${t.y}px`;
+                el.style.width = `${t.w || 60}px`;
+                el.style.height = `${t.h || 60}px`;
+                el.innerText = t.label;
+
+                // Eventos de interacción
+                el.onpointerdown = (e) => {
+                    e.stopPropagation();
+                    if(isDesignMode) {
+                        handleDrag(e, t, el);
+                    } else {
+                        // Cambiar estado en modo lectura
+                        t.status = t.status === 'free' ? 'occupied' : (t.status === 'occupied' ? 'undefined' : 'free');
+                        saveData();
+                        render();
                     }
                 };
-                layer.appendChild(div);
+
+                // Abrir edición en modo diseño con un clic
+                el.onclick = () => {
+                    if(isDesignMode) openEditModal(t);
+                };
+
+                mesasLayer.appendChild(el);
             });
-            document.getElementById('stat-occupied').innerText = count;
-            document.getElementById('stat-percent').innerText = Math.round((count/tables.length)*100) + '%';
-            if(document.getElementById('note-insitu')) document.getElementById('note-insitu').value = count;
+
+            document.getElementById('c-free').innerText = counts.free;
+            document.getElementById('c-occ').innerText = counts.occ;
+            document.getElementById('c-und').innerText = counts.und;
         }
 
-        function saveAudit() {
-            const a = {
-                id: Date.now(),
-                date: new Date().toLocaleDateString(),
-                time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
-                insitu: document.getElementById('note-insitu').value,
-                micros: document.getElementById('note-micros').value || 0,
-                lugar: document.getElementById('note-lugar').value || "Lobby 1225",
-                firma: document.getElementById('note-firma').value || "N/A",
-                obs: document.getElementById('note-observaciones').value || "Sin observaciones"
+        function handleDrag(e, t, el) {
+            let sX = e.clientX, sY = e.clientY;
+            let iX = t.x, iY = t.y;
+            el.classList.add('dragging');
+            el.setPointerCapture(e.pointerId);
+            
+            const onMove = (ev) => {
+                t.x = iX + (ev.clientX - sX) / scale;
+                t.y = iY + (ev.clientY - sY) / scale;
+                el.style.left = `${t.x}px`;
+                el.style.top = `${t.y}px`;
             };
-            audits.unshift(a); saveData(); setMode('history'); showToast("Reporte Guardado");
+            
+            const onUp = () => {
+                el.classList.remove('dragging');
+                saveData();
+                el.removeEventListener('pointermove', onMove);
+                el.removeEventListener('pointerup', onUp);
+            };
+            
+            el.addEventListener('pointermove', onMove);
+            el.addEventListener('pointerup', onUp);
         }
 
-        // FUNCIÓN EXPORTAR TXT (RECUPERADA)
-        function exportTXT(id) {
-            const a = audits.find(x => x.id === id);
-            if(!a) return;
-            const content = `REPORTES SPOT CHECK 1225\n` +
-                          `====================\n` +
-                          `Fecha: ${a.date}\n` +
-                          `Hora: ${a.time}\n` +
-                          `Lugar: ${a.lugar}\n` +
-                          `--------------------\n` +
-                          `Mesas Físicas: ${a.insitu}\n` +
-                          `Mesas POS: ${a.micros}\n` +
-                          `Diferencia: ${a.insitu - a.micros}\n` +
-                          `--------------------\n` +
-                          `Firma: ${a.firma}\n` +
-                          `Observaciones: ${a.obs}\n` +
-                          `====================`;
-            const blob = new Blob([content], {type:'text/plain'});
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = `Reporte_1225_${a.date.replace(/\//g,'-')}_${a.time.replace(/:/g,'')}.txt`;
-            link.click();
-            showToast("TXT Descargado");
+        function switchTab(tab) {
+            // Limpiar estados
+            document.querySelectorAll('.screen-overlay').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('design-toolbar').style.display = 'none';
+            mapContainer.classList.remove('design-grid');
+            
+            isDesignMode = (tab === 'design');
+            const ind = document.getElementById('mode-indicator');
+
+            if(tab === 'map') {
+                ind.innerText = "MODO LECTURA";
+                ind.className = "text-[8px] font-black uppercase text-slate-400 bg-slate-100 px-2 py-1 rounded tracking-widest";
+            } else if(tab === 'design') {
+                document.getElementById('design-toolbar').style.display = 'flex';
+                mapContainer.classList.add('design-grid');
+                ind.innerText = "MODO CONSTRUCTOR (MUEVA PIEZAS)";
+                ind.className = "text-[8px] font-black uppercase text-amber-600 bg-amber-100 px-2 py-1 rounded tracking-widest";
+            } else {
+                document.getElementById(`${tab}-screen`).classList.add('active');
+                if(tab === 'report') renderHistory();
+            }
+
+            document.getElementById(`btn-${tab}`).classList.add('active');
+        }
+
+        function openEditModal(t) {
+            selectedMesaId = t.id;
+            document.getElementById('edit-label').value = t.label;
+            document.getElementById('edit-w').value = t.w || 60;
+            document.getElementById('edit-h').value = t.h || 60;
+            openModal('edit-mesa-modal');
+        }
+
+        function saveMesaEdit() {
+            const t = tables.find(x => x.id === selectedMesaId);
+            if(t) {
+                t.label = document.getElementById('edit-label').value;
+                t.w = parseInt(document.getElementById('edit-w').value);
+                t.h = parseInt(document.getElementById('edit-h').value);
+                saveData(); render(); closeModal('edit-mesa-modal');
+            }
+        }
+
+        function setMesaProp(prop, val) {
+            const t = tables.find(x => x.id === selectedMesaId);
+            if(t) { t[prop] = val; render(); }
+        }
+
+        function deleteMesa() {
+            if(confirm("¿Eliminar esta mesa definitivamente?")) {
+                tables = tables.filter(x => x.id !== selectedMesaId);
+                saveData(); render(); closeModal('edit-mesa-modal');
+            }
+        }
+
+        function addNewMesa() {
+            const newM = {
+                id: Date.now(), label: '+', x: 100 / scale, y: 100 / scale, w: 65, h: 65, type: 'cuadrado', status: 'free'
+            };
+            tables.push(newM);
+            saveData(); render();
+        }
+
+        function confirmSave() {
+            const audit = {
+                id: Date.now(),
+                fecha: new Date().toLocaleString(),
+                auditor: document.getElementById('f-auditor').value || 'S/N',
+                lugar: document.getElementById('f-lugar').value || 'GENERAL',
+                insitu: document.getElementById('f-fisico').value || '0',
+                micros: document.getElementById('f-sistema').value || '0',
+                obs: document.getElementById('main-notes').value || 'Sin observaciones',
+                u: tables.filter(t => t.status === 'undefined').length
+            };
+            audits.unshift(audit);
+            localStorage.setItem(`${DB_PREFIX}_audits`, JSON.stringify(audits));
+            closeModal('save-modal');
+            switchTab('report');
         }
 
         function renderHistory() {
             const list = document.getElementById('history-list');
             list.innerHTML = audits.map(a => `
-                <div class="bg-white p-5 rounded-[2rem] border border-slate-200 shadow-sm">
-                    <div class="flex justify-between items-start mb-3">
+                <div class="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                    <div class="flex justify-between items-start mb-4">
                         <div>
-                            <p class="font-black text-[10px] uppercase text-slate-400">${a.date} | ${a.time}</p>
-                            <p class="text-[9px] font-bold text-slate-900">${a.lugar}</p>
+                            <span class="block text-[8px] font-black text-slate-300 uppercase">${a.fecha}</span>
+                            <h4 class="font-black text-slate-900 text-sm uppercase italic tracking-tighter">${a.auditor}</h4>
                         </div>
-                        <button onclick="exportTXT(${a.id})" class="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full font-black text-[9px] uppercase">
-                            <i class="fa-solid fa-download mr-1"></i> TXT
-                        </button>
+                        <div class="${a.u > 0 ? 'bg-red-50 text-red-600' : 'bg-slate-50 text-slate-400'} px-3 py-1 rounded-full font-black text-[9px] uppercase italic">
+                            Fallas: ${a.u}
+                        </div>
                     </div>
-                    <div class="grid grid-cols-2 gap-2 text-[10px] font-black bg-slate-50 p-3 rounded-xl">
-                        <div class="text-slate-500">FÍSICO: <span class="text-slate-900">${a.insitu}</span></div>
-                        <div class="text-slate-500">POS: <span class="text-slate-900">${a.micros}</span></div>
+                    
+                    <div class="space-y-3">
+                        <div class="flex items-center gap-2">
+                            <span class="text-slate-400 font-bold uppercase text-[8px]">Sector:</span>
+                            <span class="font-black text-slate-700 italic text-[11px] uppercase">${a.lugar}</span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-3xl border border-slate-100">
+                            <div>
+                                <span class="text-slate-400 font-bold uppercase text-[7px] block">In Situ</span>
+                                <span class="font-black text-slate-800 text-lg leading-none">${a.insitu}</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-400 font-bold uppercase text-[7px] block">Micros</span>
+                                <span class="font-black text-red-600 text-lg leading-none">${a.micros}</span>
+                            </div>
+                        </div>
+                        <div class="bg-white p-4 rounded-2xl border border-slate-50">
+                            <p class="text-[10px] text-slate-500 font-medium uppercase italic leading-tight">${a.obs}</p>
+                        </div>
                     </div>
                 </div>
-            `).join('') || '<p class="text-center opacity-30 py-10 text-[10px] font-black">HISTORIAL VACÍO</p>';
+            `).join('') || '<p class="text-center py-20 uppercase font-black text-slate-300 italic text-xs">Historial Vacío</p>';
         }
 
-        function setMode(m) {
-            currentMode = m;
-            document.getElementById('nav-audit').className = `flex-1 py-2 rounded-xl font-black text-[10px] uppercase transition-all ${m==='audit'?'bg-white shadow-sm text-slate-950 border-b-2 border-emerald-500':'text-slate-400'}`;
-            document.getElementById('nav-notes').className = `flex-1 py-2 rounded-xl font-black text-[10px] uppercase transition-all ${m==='notes'?'bg-white shadow-sm text-slate-950 border-b-2 border-emerald-500':'text-slate-400'}`;
-            document.getElementById('nav-history').className = `flex-1 py-2 rounded-xl font-black text-[10px] uppercase transition-all ${m==='history'?'bg-white shadow-sm text-slate-950 border-b-2 border-emerald-500':'text-slate-400'}`;
-            
-            document.getElementById('notes-screen').classList.toggle('active', m === 'notes');
-            document.getElementById('history-screen').classList.toggle('active', m === 'history');
-            document.getElementById('main-footer').style.display = (m === 'history' || m === 'notes') ? 'none' : 'block';
-            
-            if(m === 'notes') document.getElementById('note-hora').value = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-            if(m === 'history') renderHistory();
-            render();
-        }
+        function changeZoom(d) { scale = Math.min(Math.max(scale + d, 0.1), 3); applyTransform(); }
+        function resetZoom() { scale = 0.5; tx = 20; ty = 20; applyTransform(); }
+        function applyTransform() { mapContainer.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`; }
+        function saveData() { localStorage.setItem(`${DB_PREFIX}_tables`, JSON.stringify(tables)); }
+        function resetLayout() { if(confirm("¿Restablecer el plano original?")) { createInitialLayout(); render(); } }
+        function clearHistory() { if(confirm("¿Borrar todo el historial?")) { audits=[]; localStorage.removeItem(`${DB_PREFIX}_audits`); renderHistory(); } }
+        function openModal(id) { document.getElementById(id).classList.replace('hidden', 'flex'); }
+        function closeModal(id) { document.getElementById(id).classList.replace('flex', 'hidden'); }
 
-        function toggleLock() {
-            isLocked = !isLocked;
-            document.getElementById('lock-icon').className = isLocked ? 'fa-solid fa-lock text-red-500' : 'fa-solid fa-unlock text-emerald-400';
-            document.getElementById('lock-text').innerText = isLocked ? 'BLOQUEADO' : 'EDICIÓN';
-            document.getElementById('lock-text').className = isLocked ? 'text-[9px] font-black uppercase text-slate-500' : 'text-[9px] font-black uppercase text-emerald-500';
-            showToast(isLocked ? "Mapa Bloqueado" : "Modo Edición Activado");
-        }
-
-        function toggleFit() {
-            const container = document.getElementById('map-container');
-            const main = document.getElementById('main-scroll');
-            if (!isFitted) {
-                const scale = Math.min(main.clientWidth / container.offsetWidth, main.clientHeight / container.offsetHeight, 1) * 0.95;
-                container.style.transform = `scale(${scale})`;
-            } else { container.style.transform = `scale(1)`; }
-            isFitted = !isFitted;
-        }
-
-        async function handleOCR(input) {
-            const file = input.files[0]; if (!file) return;
-            const textEl = document.getElementById('ocr-text');
-            const ocrIcon = document.getElementById('ocr-icon');
-            
-            textEl.innerText = "LEYENDO...";
-            if(ocrIcon) ocrIcon.className = "fa-solid fa-spinner fa-spin";
-
-            try {
-                // Configuramos Tesseract para que sea más flexible con la tipografía del POS
-                const result = await Tesseract.recognize(file, 'eng');
-                const text = result.data.text;
-                
-                // Patrón 1: Busca Tbl, Tb1, 7bl, etc. seguido de número
-                // Patrón 2: Busca simplemente un número seguido de una barra / (ej: "25/")
-                const regex = /(?:Tbl|Tb1|7bl|Thl|Ibl|1bl|lb1)?\s*(\d+)\s*\//gi; 
-                
-                let match, count = 0;
-                // Limpiamos estados anteriores
-                tables.forEach(t => t.status = 'free');
-
-                while ((match = regex.exec(text)) !== null) {
-                    const tableNum = match[1];
-                    const target = tables.find(t => t.label === tableNum);
-                    if (target) { 
-                        target.status = 'occupied'; 
-                        count++; 
-                    }
-                }
-
-                if (count > 0) {
-                    showToast(`SINCRO: ${count} MESAS`);
-                } else {
-                    showToast("NO SE DETECTARON MESAS");
-                }
-            } catch (e) { 
-                showToast("ERROR DE LECTURA"); 
-            } finally {
-                textEl.innerText = "SCAN"; 
-                if(ocrIcon) ocrIcon.className = "fa-solid fa-camera";
-                render(); 
-                saveData();
-                input.value = ""; // Limpia el input para permitir re-escaneo
-            }
-        }
-
-        function showToast(msg) {
-            const t = document.getElementById('toast');
-            const msgEl = document.getElementById('toast-msg');
-            if (t && msgEl) {
-                msgEl.innerText = msg;
-                t.classList.add('show'); 
-                setTimeout(() => t.classList.remove('show'), 2500);
-            }
-        }
-
-        function saveData() {
-            localStorage.setItem(`${DB_PREFIX}_tables`, JSON.stringify(tables));
-            localStorage.setItem(`${DB_PREFIX}_audits`, JSON.stringify(audits));
-        }
-
-        function clearCurrent() { 
-            if(confirm("¿Resetear conteo actual?")) { 
-                tables.forEach(t => t.status = 'free'); 
-                render(); 
-                saveData(); 
-            } 
-        }
-
-        function clearHistory() { 
-            if(confirm("¿Borrar todo el historial de reportes?")) { 
-                audits = []; 
-                if (typeof renderHistory === 'function') renderHistory(); 
-                saveData(); 
-            } 
-        }
-
-        // Iniciar la aplicación
-        init();
+        window.onload = init;
     </script>
 </body>
 </html>
