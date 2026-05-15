@@ -292,26 +292,57 @@
         async function handleOCR(input) {
             const file = input.files[0]; if (!file) return;
             const textEl = document.getElementById('ocr-text');
+            const ocrIcon = document.getElementById('ocr-icon');
+            
             textEl.innerText = "LEYENDO...";
+            if(ocrIcon) ocrIcon.className = "fa-solid fa-spinner fa-spin";
+
             try {
+                // Configuramos Tesseract para que sea más flexible con la tipografía del POS
                 const result = await Tesseract.recognize(file, 'eng');
                 const text = result.data.text;
-                const regex = /Tbl\s+(\d+)\//g; 
+                
+                // Patrón 1: Busca Tbl, Tb1, 7bl, etc. seguido de número
+                // Patrón 2: Busca simplemente un número seguido de una barra / (ej: "25/")
+                const regex = /(?:Tbl|Tb1|7bl|Thl|Ibl|1bl|lb1)?\s*(\d+)\s*\//gi; 
+                
                 let match, count = 0;
+                // Limpiamos estados anteriores
                 tables.forEach(t => t.status = 'free');
+
                 while ((match = regex.exec(text)) !== null) {
-                    const target = tables.find(t => t.label === match[1]);
-                    if (target) { target.status = 'occupied'; count++; }
+                    const tableNum = match[1];
+                    const target = tables.find(t => t.label === tableNum);
+                    if (target) { 
+                        target.status = 'occupied'; 
+                        count++; 
+                    }
                 }
-                showToast(`SCAN: ${count} MESAS`);
-            } catch (e) { showToast("ERROR OCR"); }
-            textEl.innerText = "SCAN"; render(); saveData();
+
+                if (count > 0) {
+                    showToast(`SINCRO: ${count} MESAS`);
+                } else {
+                    showToast("NO SE DETECTARON MESAS");
+                }
+            } catch (e) { 
+                showToast("ERROR DE LECTURA"); 
+            } finally {
+                textEl.innerText = "SCAN"; 
+                if(ocrIcon) ocrIcon.className = "fa-solid fa-camera";
+                render(); 
+                saveData();
+                input.value = ""; // Limpia el input para permitir re-escaneo
+            }
         }
 
         function showToast(msg) {
             const t = document.getElementById('toast');
-            document.getElementById('toast-msg').innerText = msg;
-            t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2000);
+            const msgEl = document.getElementById('toast-msg');
+            if (t && msgEl) {
+                msgEl.innerText = msg;
+                t.classList.add('show'); 
+                setTimeout(() => t.classList.remove('show'), 2500);
+            }
         }
 
         function saveData() {
@@ -319,9 +350,23 @@
             localStorage.setItem(`${DB_PREFIX}_audits`, JSON.stringify(audits));
         }
 
-        function clearCurrent() { if(confirm("¿Resetear conteo actual?")) { tables.forEach(t => t.status = 'free'); render(); saveData(); } }
-        function clearHistory() { if(confirm("¿Borrar historial?")) { audits = []; renderHistory(); saveData(); } }
+        function clearCurrent() { 
+            if(confirm("¿Resetear conteo actual?")) { 
+                tables.forEach(t => t.status = 'free'); 
+                render(); 
+                saveData(); 
+            } 
+        }
 
+        function clearHistory() { 
+            if(confirm("¿Borrar todo el historial de reportes?")) { 
+                audits = []; 
+                if (typeof renderHistory === 'function') renderHistory(); 
+                saveData(); 
+            } 
+        }
+
+        // Iniciar la aplicación
         init();
     </script>
 </body>
