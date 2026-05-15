@@ -342,7 +342,7 @@
         let startMesaSize = { w: 0, h: 0 };
 
         /* ==========================================================================
-           ALGORITMO DE EXTRACCIÓN DE MESAS DESDE IMAGEN (POS)
+           ALGORITMO DE EXTRACCIÓN DE MESAS DESDE IMAGEN (POS) - CORREGIDO
            ========================================================================== */
         async function processPOSImage(event) {
             const file = event.target.files[0];
@@ -352,31 +352,49 @@
             loading.style.display = 'flex';
 
             try {
-                // Ejecutar Tesseract OCR sobre la imagen
-                const { data: { text } } = await Tesseract.recognize(file, 'eng');
+                // 1. Limpiar todas las mesas (poner en blanco) antes de empezar
+                tables.forEach(t => t.status = 'free');
                 
-                // Algoritmo: Buscar "Tbl", un espacio, y capturar el número antes de la barra "/"
-                // Regex explica: "Tbl" + espacio opcional + (captura dígitos) + "/"
+                const { data: { text } } = await Tesseract.recognize(file, 'eng');
+                console.log("Texto detectado:", text); // Para depuración en consola
+
+                // 2. Regex ajustada: busca "Tbl", espacio(s), captura el número, y busca la "/"
+                // La "i" es para ignorar mayúsculas/minúsculas
                 const tableRegex = /Tbl\s+(\d+)\//gi;
                 let match;
                 const foundTables = [];
 
                 while ((match = tableRegex.exec(text)) !== null) {
-                    foundTables.push(match[1]); // El primer grupo de captura es el número
+                    foundTables.push(match[1]); 
                 }
 
                 if (foundTables.length > 0) {
-                    applyOccupancyFromPOS(foundTables);
-                    showToast(`${foundTables.length} mesas importadas del POS`);
+                    // 3. Pintar de negro solo las detectadas
+                    foundTables.forEach(label => {
+                        const mesa = tables.find(t => t.label === label);
+                        if (mesa) {
+                            mesa.status = 'occupied';
+                        }
+                    });
+
+                    saveData();
+                    render();
+                    
+                    if (document.getElementById('note-micros')) {
+                        document.getElementById('note-micros').value = foundTables.length;
+                        calculateDiscrepancy();
+                    }
+                    showToast(`${foundTables.length} mesas marcadas de negro`);
                 } else {
-                    showToast("No se detectaron mesas en la imagen");
+                    render(); // Renderiza el plano limpio
+                    showToast("No se encontraron mesas con el formato Tbl #/");
                 }
             } catch (error) {
                 console.error("Error OCR:", error);
                 showToast("Error al procesar imagen");
             } finally {
                 loading.style.display = 'none';
-                event.target.value = ''; // Reset input
+                event.target.value = ''; 
             }
         }
 
