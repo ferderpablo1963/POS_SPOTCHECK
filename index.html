@@ -171,11 +171,11 @@
             </div>
         </div>
         <div class="flex gap-2">
-            <label class="cursor-pointer flex items-center gap-2 px-4 py-2 bg-emerald-600 rounded-2xl border border-emerald-500 transition-all active:scale-95">
-                <i class="fa-solid fa-camera text-white"></i>
-                <span class="text-[9px] font-black uppercase text-white">Escanear POS</span>
-                <input type="file" accept="image/*" class="hidden" onchange="processPOSImage(event)">
-            </label>
+           <label class="cursor-pointer bg-emerald-500 px-4 py-2 rounded-xl flex items-center gap-2 shadow-lg active:scale-95 transition-all">
+    <i class="fa-solid fa-camera text-slate-950"></i>
+    <span class="text-[10px] font-black text-slate-950 uppercase">ESCANEAR POS</span>
+    <input type="file" accept="image/*" capture="environment" class="hidden" onchange="processPOSImage(event)">
+</label> 
             <button onclick="toggleLock()" id="lock-btn" class="group flex items-center gap-2 px-4 py-2 bg-slate-900 rounded-2xl border border-slate-800 transition-all active:scale-95">
                 <span id="lock-text" class="text-[9px] font-black uppercase text-slate-500">Bloqueado</span>
                 <i class="fa-solid fa-lock text-red-500" id="lock-icon"></i>
@@ -341,11 +341,7 @@
         let startMesaPos = { x: 0, y: 0 };
         let startMesaSize = { w: 0, h: 0 };
 
-
-
-
-        /* ==========================================================================
-           // --- INICIO DE ALGORITMO DE ESCANEO POS ---
+// --- INICIO DE ALGORITMO DE ESCANEO POS ---
 // Importamos la librería dinámicamente para no romper tu estructura
 const scriptOCR = document.createElement('script');
 scriptOCR.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
@@ -379,6 +375,26 @@ async function processPOSImage(event) {
                 foundCount++;
             }
         }
+
+        // 4. ACTUALIZAR INTERFAZ SIN CAMBIAR ESTRUCTURA
+        saveData();
+        render();
+        
+        if (foundCount > 0) {
+            showToast(`Se marcaron ${foundCount} mesas`);
+        } else {
+            showToast("No se detectaron mesas con formato Tbl #/");
+        }
+
+    } catch (error) {
+        console.error("Error en OCR:", error);
+        showToast("Error al procesar la imagen");
+    } finally {
+        event.target.value = ''; // Reset del input
+    }
+}
+// --- FIN DE ALGORITMO DE ESCANEO POS ---
+
 
         // 4. ACTUALIZAR INTERFAZ SIN CAMBIAR ESTRUCTURA
         saveData();
